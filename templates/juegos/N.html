@@ -1,19 +1,368 @@
 {% extends "base.html" %}
 
-{% block title %}Letra N - Números{% endblock %}
+{% block title %}Letra N - El Nido{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🔢 Letra N - Números</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🐦 Letra N - El Nido</h1>
+    <p class="game-description">¡Un pajarito perdió su nido! Toca el nido con la letra N</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let gameState = 'playing'; // 'playing', 'celebrating'
+let birdX = 400;
+let birdY = 100;
+let birdAngle = 0;
+let birdSpeed = 2;
+let celebrating = false;
+let celebrationTimer = 0;
+
+// Posiciones de los árboles y nidos
+const trees = [
+    { x: 150, y: 400, letter: 'H', clicked: false },
+    { x: 400, y: 400, letter: 'N', clicked: false, correct: true },
+    { x: 650, y: 400, letter: 'M', clicked: false }
+];
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar árbol
+function drawTree(x, y) {
+    // Tronco
+    ctx.fillStyle = '#654321';
+    ctx.fillRect(x - 20, y, 40, 150);
+    
+    // Textura del tronco
+    ctx.strokeStyle = '#4a2f1a';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x - 15 + i * 15, y + 20);
+        ctx.lineTo(x - 12 + i * 15, y + 140);
+        ctx.stroke();
+    }
+    
+    // Copa del árbol (3 círculos)
+    ctx.fillStyle = '#228B22';
+    ctx.beginPath();
+    ctx.arc(x - 40, y + 20, 50, 0, Math.PI * 2);
+    ctx.arc(x + 40, y + 20, 50, 0, Math.PI * 2);
+    ctx.arc(x, y - 10, 60, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Hojas más claras para profundidad
+    ctx.fillStyle = '#32CD32';
+    ctx.beginPath();
+    ctx.arc(x - 20, y + 10, 40, 0, Math.PI * 2);
+    ctx.arc(x + 20, y + 10, 40, 0, Math.PI * 2);
+    ctx.arc(x, y - 20, 45, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Dibujar nido
+function drawNest(x, y, letter, isCorrect, isClicked) {
+    const nestY = y - 30;
+    
+    // Sombra del nido
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(x, nestY + 35, 45, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Nido (ramitas entrelazadas)
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    
+    // Base del nido
+    ctx.fillStyle = '#A0522D';
+    ctx.beginPath();
+    ctx.ellipse(x, nestY + 30, 40, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Ramitas del nido
+    for (let i = 0; i < 8; i++) {
+        const angle = (i * Math.PI * 2) / 8;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(angle) * 30, nestY + 30 + Math.sin(angle) * 15);
+        ctx.lineTo(x + Math.cos(angle) * 40, nestY + 30 + Math.sin(angle) * 20);
+        ctx.stroke();
+    }
+    
+    // Interior del nido (más claro)
+    ctx.fillStyle = '#D2691E';
+    ctx.beginPath();
+    ctx.ellipse(x, nestY + 30, 30, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Letra en el nido
+    ctx.font = 'bold 50px Arial';
+    ctx.fillStyle = isCorrect && isClicked ? '#FFD700' : '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText(letter, x, nestY + 30);
+    ctx.fillText(letter, x, nestY + 30);
+    
+    // Brillo si es el correcto y fue clickeado
+    if (isCorrect && isClicked) {
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x, nestY + 30, 50, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+}
+
+// Dibujar pajarito
+function drawBird(x, y, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    
+    // Cuerpo del pájaro
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 20, 15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cabeza
+    ctx.fillStyle = '#FFA500';
+    ctx.beginPath();
+    ctx.arc(-15, -5, 12, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Ojo
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(-18, -7, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pico
+    ctx.fillStyle = '#FF6347';
+    ctx.beginPath();
+    ctx.moveTo(-25, -5);
+    ctx.lineTo(-30, -3);
+    ctx.lineTo(-25, -1);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Alas (animadas)
+    const wingAngle = Math.sin(Date.now() / 100) * 0.3;
+    ctx.fillStyle = '#FFA500';
+    
+    // Ala izquierda
+    ctx.save();
+    ctx.rotate(wingAngle);
+    ctx.beginPath();
+    ctx.ellipse(-5, -10, 15, 8, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    
+    // Ala derecha
+    ctx.save();
+    ctx.rotate(-wingAngle);
+    ctx.beginPath();
+    ctx.ellipse(-5, 10, 15, 8, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    
+    // Cola
+    ctx.fillStyle = '#FF8C00';
+    ctx.beginPath();
+    ctx.moveTo(20, 0);
+    ctx.lineTo(30, -8);
+    ctx.lineTo(30, 8);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// Manejo de clics
+function handleClick(e) {
+    e.preventDefault();
+    if (celebrating) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    // Verificar si tocó algún nido
+    trees.forEach(tree => {
+        const nestY = tree.y - 30;
+        const distance = Math.sqrt((pos.x - tree.x) ** 2 + (pos.y - nestY) ** 2);
+        
+        if (distance < 50) {
+            tree.clicked = true;
+            
+            if (tree.correct) {
+                // ¡Correcto!
+                celebrating = true;
+                celebrationTimer = 0;
+            }
+        }
+    });
+}
+
+canvas.addEventListener('click', handleClick);
+canvas.addEventListener('touchstart', handleClick);
+
+// Loop del juego
+function gameLoop() {
+    // Fondo (cielo)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#87CEEB');
+    gradient.addColorStop(1, '#E0F6FF');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Nubes
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.beginPath();
+    ctx.arc(100, 80, 30, 0, Math.PI * 2);
+    ctx.arc(130, 80, 40, 0, Math.PI * 2);
+    ctx.arc(160, 80, 30, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.arc(600, 120, 35, 0, Math.PI * 2);
+    ctx.arc(640, 120, 45, 0, Math.PI * 2);
+    ctx.arc(680, 120, 35, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Suelo
+    ctx.fillStyle = '#90EE90';
+    ctx.fillRect(0, 550, canvas.width, 50);
+    
+    // Pasto
+    ctx.strokeStyle = '#228B22';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < canvas.width; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(i, 550);
+        ctx.lineTo(i + 10, 560);
+        ctx.stroke();
+    }
+    
+    // Dibujar árboles y nidos
+    trees.forEach(tree => {
+        drawTree(tree.x, tree.y);
+        drawNest(tree.x, tree.y, tree.letter, tree.correct, tree.clicked);
+    });
+    
+    // Animar pajarito
+    if (!celebrating) {
+        // Volar en círculo confundido
+        birdAngle += 0.02;
+        birdX = 400 + Math.cos(birdAngle) * 150;
+        birdY = 200 + Math.sin(birdAngle) * 80;
+        drawBird(birdX, birdY, birdAngle + Math.PI / 2);
+        
+        // Instrucciones
+        ctx.font = 'bold 26px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.strokeText('🐦 ¡Toca el nido con la letra N!', canvas.width / 2, 40);
+        ctx.fillText('🐦 ¡Toca el nido con la letra N!', canvas.width / 2, 40);
+    } else {
+        // Volar hacia el nido correcto
+        const correctTree = trees.find(t => t.correct);
+        const targetX = correctTree.x;
+        const targetY = correctTree.y - 30;
+        
+        const dx = targetX - birdX;
+        const dy = targetY - birdY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance > 5) {
+            birdX += (dx / distance) * 4;
+            birdY += (dy / distance) * 4;
+            const angle = Math.atan2(dy, dx);
+            drawBird(birdX, birdY, angle);
+        } else {
+            // Pajarito en el nido
+            drawBird(targetX, targetY, 0);
+            
+            celebrationTimer++;
+            
+            // Mensaje de celebración
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.font = 'bold 80px Arial';
+            ctx.fillStyle = '#FFD700';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 8;
+            ctx.textAlign = 'center';
+            ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+            ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+            
+            ctx.font = 'bold 30px Arial';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 4;
+            ctx.strokeText('¡El pajarito encontró su nido!', canvas.width / 2, canvas.height / 2 + 40);
+            ctx.fillText('¡El pajarito encontró su nido!', canvas.width / 2, canvas.height / 2 + 40);
+            
+            // Reiniciar después de 3 segundos
+            if (celebrationTimer > 180) {
+                celebrating = false;
+                celebrationTimer = 0;
+                birdAngle = 0;
+                trees.forEach(t => t.clicked = false);
+            }
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}

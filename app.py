@@ -27,7 +27,7 @@ JUEGOS = {
     'K': {'nombre': 'Sube al Koala', 'descripcion': 'Toca la K cuando se ilumine para ayudar al koala a subir'},
     'L': {'nombre': 'Enciende la Luna', 'descripcion': 'Frota la pantalla para limpiar las nubes y ver la luna'},
     'M': {'nombre': 'Cosecha de Manzanas', 'descripcion': 'Arrastra solo las manzanas a la cesta'},
-    'N': {'nombre': 'Números', 'descripcion': 'Cuenta con la letra N'},
+    'N': {'nombre': 'El Nido', 'descripcion': 'Ayuda al pajarito a encontrar su nido con la letra N'},
     'O': {'nombre': 'Ordenar Círculos', 'descripcion': 'Ordena círculos con la letra O'},
     'P': {'nombre': 'Pintar', 'descripcion': 'Pinta la letra P con tus dedos'},
     'Q': {'nombre': 'Queso para Ratón', 'descripcion': 'Arrastra el queso al ratón'},
