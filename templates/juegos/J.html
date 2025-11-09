@@ -65,7 +65,8 @@ function drawGiraffe() {
     // Dibujar la imagen de la jirafa centrada y en el suelo
     const imgWidth = 220;
     const imgHeight = 320;
-    ctx.drawImage(giraffeImg, -imgWidth/2, -imgHeight + 50, imgWidth, imgHeight);
+    // Ajustar para que las patas toquen el suelo verde (y=550)
+    ctx.drawImage(giraffeImg, -imgWidth/2, -imgHeight + 90, imgWidth, imgHeight);
     
     ctx.restore();
 }
