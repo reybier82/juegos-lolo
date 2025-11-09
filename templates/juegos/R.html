@@ -42,6 +42,9 @@ let offsetY = 0;
 let completed = false;
 let celebrationTimer = 0;
 let glowIntensity = 0;
+let celebrationPhase = 0; // 0: brillo, 1: movimiento al centro, 2: mensaje
+let puzzleOffsetX = 0;
+let puzzleOffsetY = 0;
 
 // Configuración del rompecabezas
 const puzzleSize = 300; // Tamaño del área del rompecabezas completo
@@ -107,11 +110,11 @@ function getInputPosition(e, canvas) {
 }
 
 // Dibujar pieza del rompecabezas
-function drawPiece(piece) {
+function drawPiece(piece, offsetX = 0, offsetY = 0) {
     if (!puzzleImg.complete) return;
     
-    const x = piece.currentX;
-    const y = piece.currentY;
+    const x = piece.currentX + offsetX;
+    const y = piece.currentY + offsetY;
     
     // Sombra
     if (!piece.placed) {
@@ -241,6 +244,9 @@ function handleEnd(e) {
         if (pieces.every(p => p.placed)) {
             completed = true;
             celebrationTimer = 0;
+            celebrationPhase = 0;
+            puzzleOffsetX = 0;
+            puzzleOffsetY = 0;
         }
     }
     
@@ -289,71 +295,179 @@ function gameLoop() {
     }
     
     // Dibujar tablero guía
-    drawBoard();
-    
-    // Dibujar piezas
-    pieces.forEach(piece => drawPiece(piece));
+    if (!completed) {
+        drawBoard();
+    }
     
     // Celebración
     if (completed) {
         celebrationTimer++;
         glowIntensity = Math.sin(celebrationTimer * 0.1) * 0.5 + 0.5;
         
-        // Efecto de brillo sobre el rompecabezas completado
-        ctx.save();
-        ctx.globalAlpha = glowIntensity * 0.3;
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(boardX - 10, boardY - 10, puzzleSize + 20, puzzleSize + 20);
-        ctx.restore();
-        
-        // Borde dorado brillante
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 8;
-        ctx.shadowColor = '#FFD700';
-        ctx.shadowBlur = 20 * glowIntensity;
-        ctx.strokeRect(boardX - 5, boardY - 5, puzzleSize + 10, puzzleSize + 10);
-        ctx.shadowBlur = 0;
-        
-        // Mensaje de felicitación
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.font = 'bold 80px Arial';
-        ctx.fillStyle = '#FFD700';
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 8;
-        ctx.textAlign = 'center';
-        ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
-        ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
-        
-        ctx.font = 'bold 30px Arial';
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 4;
-        ctx.strokeText('¡Completaste la letra R!', canvas.width / 2, canvas.height / 2 + 20);
-        ctx.fillText('¡Completaste la letra R!', canvas.width / 2, canvas.height / 2 + 20);
-        
-        // Estrellas brillantes
-        for (let i = 0; i < 20; i++) {
-            const angle = (celebrationTimer * 0.05 + i * 0.3) % (Math.PI * 2);
-            const radius = 150 + Math.sin(celebrationTimer * 0.1 + i) * 30;
-            const x = canvas.width / 2 + Math.cos(angle) * radius;
-            const y = canvas.height / 2 + Math.sin(angle) * radius;
-            const size = 3 + Math.sin(celebrationTimer * 0.2 + i) * 2;
+        // FASE 0: Brillo inicial (0-60 frames = 1 segundo)
+        if (celebrationPhase === 0) {
+            // Dibujar tablero
+            drawBoard();
             
+            // Dibujar piezas normales
+            pieces.forEach(piece => drawPiece(piece));
+            
+            // Efecto de brillo sobre el rompecabezas completado
+            ctx.save();
+            ctx.globalAlpha = glowIntensity * 0.4;
             ctx.fillStyle = '#FFD700';
-            ctx.beginPath();
-            ctx.arc(x, y, size, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(boardX - 10, boardY - 10, puzzleSize + 20, puzzleSize + 20);
+            ctx.restore();
+            
+            // Borde dorado brillante
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 8 + glowIntensity * 4;
+            ctx.shadowColor = '#FFD700';
+            ctx.shadowBlur = 30 * glowIntensity;
+            ctx.strokeRect(boardX - 5, boardY - 5, puzzleSize + 10, puzzleSize + 10);
+            ctx.shadowBlur = 0;
+            
+            // Avanzar a la siguiente fase
+            if (celebrationTimer > 60) {
+                celebrationPhase = 1;
+            }
         }
         
-        // Reiniciar después de 5 segundos
-        if (celebrationTimer > 300) {
+        // FASE 1: Movimiento al centro (60-120 frames = 1 segundo)
+        else if (celebrationPhase === 1) {
+            const progress = Math.min((celebrationTimer - 60) / 60, 1);
+            const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+            
+            // Calcular posición objetivo (centro de la pantalla)
+            const targetCenterX = canvas.width / 2;
+            const targetCenterY = canvas.height / 2;
+            const currentCenterX = boardX + puzzleSize / 2;
+            const currentCenterY = boardY + puzzleSize / 2;
+            
+            // Calcular offset para mover el rompecabezas
+            puzzleOffsetX = (targetCenterX - currentCenterX) * easeProgress;
+            puzzleOffsetY = (targetCenterY - currentCenterY) * easeProgress;
+            
+            // Dibujar piezas con offset
+            pieces.forEach(piece => drawPiece(piece, puzzleOffsetX, puzzleOffsetY));
+            
+            // Efecto de brillo que crece
+            ctx.save();
+            ctx.globalAlpha = glowIntensity * 0.5;
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(
+                boardX + puzzleOffsetX - 15,
+                boardY + puzzleOffsetY - 15,
+                puzzleSize + 30,
+                puzzleSize + 30
+            );
+            ctx.restore();
+            
+            // Borde dorado brillante
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 10 + glowIntensity * 6;
+            ctx.shadowColor = '#FFD700';
+            ctx.shadowBlur = 40 * glowIntensity;
+            ctx.strokeRect(
+                boardX + puzzleOffsetX - 5,
+                boardY + puzzleOffsetY - 5,
+                puzzleSize + 10,
+                puzzleSize + 10
+            );
+            ctx.shadowBlur = 0;
+            
+            // Avanzar a la siguiente fase
+            if (celebrationTimer > 120) {
+                celebrationPhase = 2;
+            }
+        }
+        
+        // FASE 2: Mensaje de felicitación (120+ frames)
+        else if (celebrationPhase === 2) {
+            // Fondo oscuro
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Dibujar piezas en el centro con brillo
+            pieces.forEach(piece => drawPiece(piece, puzzleOffsetX, puzzleOffsetY));
+            
+            // Efecto de brillo continuo
+            ctx.save();
+            ctx.globalAlpha = glowIntensity * 0.4;
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(
+                boardX + puzzleOffsetX - 15,
+                boardY + puzzleOffsetY - 15,
+                puzzleSize + 30,
+                puzzleSize + 30
+            );
+            ctx.restore();
+            
+            // Borde dorado brillante
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 10 + glowIntensity * 6;
+            ctx.shadowColor = '#FFD700';
+            ctx.shadowBlur = 40 * glowIntensity;
+            ctx.strokeRect(
+                boardX + puzzleOffsetX - 5,
+                boardY + puzzleOffsetY - 5,
+                puzzleSize + 10,
+                puzzleSize + 10
+            );
+            ctx.shadowBlur = 0;
+            
+            // Mensaje de felicitación (aparece gradualmente)
+            const messageProgress = Math.min((celebrationTimer - 120) / 30, 1);
+            ctx.save();
+            ctx.globalAlpha = messageProgress;
+            
+            ctx.font = 'bold 80px Arial';
+            ctx.fillStyle = '#FFD700';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 8;
+            ctx.textAlign = 'center';
+            ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 200);
+            ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 200);
+            
+            ctx.font = 'bold 30px Arial';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 4;
+            ctx.strokeText('¡Completaste la letra R!', canvas.width / 2, canvas.height / 2 - 140);
+            ctx.fillText('¡Completaste la letra R!', canvas.width / 2, canvas.height / 2 - 140);
+            
+            ctx.restore();
+            
+            // Estrellas brillantes
+            if (celebrationTimer > 120) {
+                for (let i = 0; i < 20; i++) {
+                    const angle = (celebrationTimer * 0.05 + i * 0.3) % (Math.PI * 2);
+                    const radius = 200 + Math.sin(celebrationTimer * 0.1 + i) * 30;
+                    const x = canvas.width / 2 + Math.cos(angle) * radius;
+                    const y = canvas.height / 2 + Math.sin(angle) * radius;
+                    const size = 3 + Math.sin(celebrationTimer * 0.2 + i) * 2;
+                    
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        
+        // Reiniciar después de 8 segundos
+        if (celebrationTimer > 480) {
             completed = false;
             celebrationTimer = 0;
+            celebrationPhase = 0;
             glowIntensity = 0;
+            puzzleOffsetX = 0;
+            puzzleOffsetY = 0;
             initializePuzzle();
         }
+    } else {
+        // Dibujar piezas normales cuando no está completado
+        pieces.forEach(piece => drawPiece(piece));
     }
     
     requestAnimationFrame(gameLoop);
