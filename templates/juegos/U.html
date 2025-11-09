@@ -90,13 +90,60 @@ function getInputPosition(e, canvas) {
 // Verificar si un punto está cerca de la letra U
 function isNearLetterU(x, y) {
     const distance = Math.sqrt(Math.pow(x - letterUX, 2) + Math.pow(y - letterUY, 2));
-    return distance < 35;
+    return distance < 25;
 }
 
 // Verificar si la letra U llegó a la uva
 function checkReachedGrape() {
     const distance = Math.sqrt(Math.pow(letterUX - grapeX, 2) + Math.pow(letterUY - grapeY, 2));
-    return distance < 50;
+    return distance < 40;
+}
+
+// Verificar colisión con paredes
+function checkWallCollision(x, y) {
+    const letterRadius = 20;
+    
+    for (let wall of walls) {
+        const distance = distanceToLineSegment(x, y, wall.x1, wall.y1, wall.x2, wall.y2);
+        if (distance < letterRadius) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Calcular distancia de un punto a un segmento de línea
+function distanceToLineSegment(px, py, x1, y1, x2, y2) {
+    const A = px - x1;
+    const B = py - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+    
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    
+    if (lenSq !== 0) {
+        param = dot / lenSq;
+    }
+    
+    let xx, yy;
+    
+    if (param < 0) {
+        xx = x1;
+        yy = y1;
+    } else if (param > 1) {
+        xx = x2;
+        yy = y2;
+    } else {
+        xx = x1 + param * C;
+        yy = y1 + param * D;
+    }
+    
+    const dx = px - xx;
+    const dy = py - yy;
+    
+    return Math.sqrt(dx * dx + dy * dy);
 }
 
 // Dibujar uva
@@ -145,24 +192,24 @@ function drawGrape(x, y) {
     ctx.fill();
 }
 
-// Dibujar letra U (movible)
+// Dibujar letra U (movible y más pequeña)
 function drawLetterU(x, y) {
     // Círculo de fondo
     ctx.fillStyle = '#FFD700';
     ctx.beginPath();
-    ctx.arc(x, y, 35, 0, Math.PI * 2);
+    ctx.arc(x, y, 20, 0, Math.PI * 2);
     ctx.fill();
     
     // Borde
     ctx.strokeStyle = '#FF9800';
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3;
     ctx.stroke();
     
     // Letra U
-    ctx.font = 'bold 50px Arial';
+    ctx.font = 'bold 28px Arial';
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#FF6B00';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeText('U', x, y);
@@ -217,9 +264,13 @@ function handleMove(e) {
     
     const pos = getInputPosition(e, canvas);
     
-    // Mover la letra U (sin restricciones de paredes)
-    letterUX = pos.x;
-    letterUY = pos.y;
+    // Verificar si la nueva posición colisiona con paredes
+    if (!checkWallCollision(pos.x, pos.y)) {
+        // Solo mover si no hay colisión
+        letterUX = pos.x;
+        letterUY = pos.y;
+    }
+    // Si hay colisión, la letra U simplemente no se mueve
     
     // Verificar si llegó a la uva
     if (checkReachedGrape()) {
