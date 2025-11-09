@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Letra A - Aplastar Burbujas{% endblock %}
+
+{% block content %}
+<div class="game-header">
+    <h1 class="game-title">🫧 Letra A - Aplastar Burbujas</h1>
+    <p class="game-description">¡Toca las burbujas con la letra A!</p>
+    <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
+</div>
+
+<div class="game-canvas-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Burbujas
+let bubbles = [];
+let score = 0;
+
+class Bubble {
+    constructor() {
+        this.x = Math.random() * (canvas.width - 100) + 50;
+        this.y = canvas.height + 50;
+        this.radius = 40 + Math.random() * 30;
+        this.speed = 1 + Math.random() * 2;
+        this.color = randomColor();
+        this.popped = false;
+    }
+    
+    update() {
+        if (!this.popped) {
+            this.y -= this.speed;
+        }
+    }
+    
+    draw() {
+        if (this.popped) return;
+        
+        // Burbuja
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color + '40';
+        ctx.fill();
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
+        // Brillo
+        ctx.beginPath();
+        ctx.arc(this.x - this.radius/3, this.y - this.radius/3, this.radius/4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.fill();
+        
+        // Letra A
+        ctx.font = `bold ${this.radius}px Arial`;
+        ctx.fillStyle = this.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('A', this.x, this.y);
+    }
+    
+    isClicked(x, y) {
+        const dist = Math.sqrt((x - this.x) ** 2 + (y - this.y) ** 2);
+        return dist < this.radius;
+    }
+    
+    pop() {
+        this.popped = true;
+        playSuccessSound();
+        score++;
+        
+        // Efecto de explosión
+        for (let i = 0; i < 10; i++) {
+            setTimeout(() => {
+                ctx.beginPath();
+                ctx.arc(
+                    this.x + (Math.random() - 0.5) * 100,
+                    this.y + (Math.random() - 0.5) * 100,
+                    Math.random() * 10,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }, i * 50);
+        }
+    }
+}
+
+// Crear burbujas periódicamente
+setInterval(() => {
+    if (bubbles.length < 8) {
+        bubbles.push(new Bubble());
+    }
+}, 1500);
+
+// Manejo de toques/clicks
+function handleInput(e) {
+    e.preventDefault();
+    const pos = getInputPosition(e, canvas);
+    
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+        if (bubbles[i].isClicked(pos.x, pos.y) && !bubbles[i].popped) {
+            bubbles[i].pop();
+            break;
+        }
+    }
+}
+
+canvas.addEventListener('mousedown', handleInput);
+canvas.addEventListener('touchstart', handleInput);
+
+// Loop del juego
+function gameLoop() {
+    // Limpiar canvas
+    ctx.fillStyle = '#E3F2FD';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Actualizar y dibujar burbujas
+    bubbles = bubbles.filter(bubble => bubble.y > -100);
+    
+    bubbles.forEach(bubble => {
+        bubble.update();
+        bubble.draw();
+    });
+    
+    // Mostrar puntuación
+    ctx.font = 'bold 40px Arial';
+    ctx.fillStyle = '#667eea';
+    ctx.textAlign = 'left';
+    ctx.fillText(`⭐ ${score}`, 20, 50);
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// Iniciar juego
+gameLoop();
+</script>
+{% endblock %}

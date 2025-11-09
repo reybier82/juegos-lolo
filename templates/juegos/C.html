@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Letra C - Colorear{% endblock %}
+
+{% block content %}
+<div class="game-header">
+    <h1 class="game-title">🎨 Letra C - Colorear</h1>
+    <p class="game-description">¡Colorea la letra C gigante!</p>
+    <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
+</div>
+
+<div class="game-canvas-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div style="text-align: center; margin-top: 15px;">
+        <button onclick="clearCanvas()" style="background: #ff6b6b; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); margin: 5px;">
+            🗑️ Borrar
+        </button>
+        <button onclick="changeSize('small')" style="background: #4ECDC4; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); margin: 5px;">
+            ⚫ Fino
+        </button>
+        <button onclick="changeSize('large')" style="background: #45B7D1; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); margin: 5px;">
+            ⚫ Grueso
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+
+let isDrawing = false;
+let currentColor = randomColor();
+let lineWidth = 15;
+
+function drawLetterC() {
+    ctx.fillStyle = '#FFF3E0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Letra C gigante de fondo
+    ctx.font = 'bold 500px Arial';
+    ctx.fillStyle = '#FFE0B2';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('C', canvas.width / 2, canvas.height / 2);
+}
+
+function clearCanvas() {
+    drawLetterC();
+    playSuccessSound();
+}
+
+function changeSize(size) {
+    lineWidth = size === 'small' ? 8 : 25;
+    playSuccessSound();
+}
+
+function startDrawing(e) {
+    e.preventDefault();
+    isDrawing = true;
+    currentColor = randomColor();
+}
+
+function stopDrawing(e) {
+    e.preventDefault();
+    isDrawing = false;
+    ctx.beginPath();
+}
+
+function draw(e) {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = currentColor;
+    
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+}
+
+canvas.addEventListener('mousedown', startDrawing);
+canvas.addEventListener('mouseup', stopDrawing);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseout', stopDrawing);
+canvas.addEventListener('touchstart', startDrawing);
+canvas.addEventListener('touchend', stopDrawing);
+canvas.addEventListener('touchmove', draw);
+
+drawLetterC();
+</script>
+{% endblock %}

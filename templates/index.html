@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Juegos del Abecedario - Inicio{% endblock %}
+
+{% block content %}
+<div class="main-header">
+    <h1 class="title-rainbow">🎮 Juegos del Abecedario 🎨</h1>
+    <p class="subtitle">¡Toca una letra para jugar!</p>
+</div>
+
+<div class="alphabet-grid">
+    {% for letra in letras %}
+    <a href="{{ url_for('juego', letra=letra) }}" class="letter-card">
+        <div class="letter-big">{{ letra }}</div>
+        <div class="game-name">{{ juegos[letra]['nombre'] }}</div>
+    </a>
+    {% endfor %}
+</div>
+
+<div class="footer-info">
+    <p>👶 Juegos educativos para niños de preescolar</p>
+</div>
+{% endblock %}

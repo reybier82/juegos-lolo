@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Letra D - Dibujar{% endblock %}
+
+{% block content %}
+<div class="game-header">
+    <h1 class="game-title">✏️ Letra D - Dibujar</h1>
+    <p class="game-description">¡Traza la letra D con tu dedo!</p>
+    <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
+</div>
+
+<div class="game-canvas-container">
+    <!-- Paleta de colores fuera del canvas -->
+    <div id="colorPalette" style="text-align: center; margin-bottom: 15px; padding: 10px; background: white; border-radius: 15px;">
+        <div style="display: inline-block;">
+            <button class="color-btn" data-color="#FF6B6B" style="background: #FF6B6B;"></button>
+            <button class="color-btn" data-color="#4ECDC4" style="background: #4ECDC4;"></button>
+            <button class="color-btn" data-color="#45B7D1" style="background: #45B7D1;"></button>
+            <button class="color-btn" data-color="#FFA07A" style="background: #FFA07A;"></button>
+            <button class="color-btn" data-color="#98D8C8" style="background: #98D8C8;"></button>
+            <button class="color-btn" data-color="#F7DC6F" style="background: #F7DC6F;"></button>
+            <button class="color-btn" data-color="#BB8FCE" style="background: #BB8FCE;"></button>
+            <button class="color-btn" data-color="#85C1E2" style="background: #85C1E2;"></button>
+            <button class="color-btn" data-color="#F8B739" style="background: #F8B739;"></button>
+            <button class="color-btn" data-color="#52B788" style="background: #52B788;"></button>
+        </div>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div style="text-align: center; margin-top: 15px;">
+        <button onclick="clearCanvas()" style="background: #ff6b6b; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+            🗑️ Borrar Todo
+        </button>
+    </div>
+</div>
+
+<style>
+.color-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    margin: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.color-btn:hover {
+    transform: scale(1.1);
+}
+
+.color-btn.active {
+    border-color: #333;
+    transform: scale(1.15);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+let isDrawing = false;
+let currentColor = '#FF6B6B';
+let lastX = 0;
+let lastY = 0;
+
+// Dibujar fondo en blanco (sin guía)
+function drawBackground() {
+    // Fondo blanco limpio
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function clearCanvas() {
+    drawBackground();
+    playSuccessSound();
+}
+
+function startDrawing(e) {
+    e.preventDefault();
+    isDrawing = true;
+    
+    const pos = getInputPosition(e, canvas);
+    lastX = pos.x;
+    lastY = pos.y;
+    
+    // Iniciar el path
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+}
+
+function stopDrawing(e) {
+    e.preventDefault();
+    isDrawing = false;
+    ctx.beginPath();
+}
+
+function draw(e) {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    // Configurar estilo
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = 30;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    // Dibujar línea
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    
+    lastX = pos.x;
+    lastY = pos.y;
+}
+
+// Eventos de mouse
+canvas.addEventListener('mousedown', startDrawing);
+canvas.addEventListener('mouseup', stopDrawing);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseout', stopDrawing);
+
+// Eventos táctiles
+canvas.addEventListener('touchstart', startDrawing);
+canvas.addEventListener('touchend', stopDrawing);
+canvas.addEventListener('touchmove', draw);
+
+// Manejo de paleta de colores (botones HTML)
+const colorButtons = document.querySelectorAll('.color-btn');
+colorButtons.forEach(btn => {
+    btn.addEventListener('click', function() {
+        // Remover clase active de todos
+        colorButtons.forEach(b => b.classList.remove('active'));
+        
+        // Agregar clase active al seleccionado
+        this.classList.add('active');
+        
+        // Cambiar color actual
+        currentColor = this.getAttribute('data-color');
+        playSuccessSound();
+    });
+});
+
+// Activar primer color por defecto
+colorButtons[0].classList.add('active');
+
+// Inicializar
+drawBackground();
+</script>
+{% endblock %}

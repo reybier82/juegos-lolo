@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Letra B - Buscar Objetos{% endblock %}
+
+{% block content %}
+<div class="game-header">
+    <h1 class="game-title">🔍 Letra B - Buscar Objetos</h1>
+    <p class="game-description">¡Encuentra y toca los objetos que empiezan con B!</p>
+    <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
+</div>
+
+<div class="game-canvas-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Objetos que empiezan con B
+const objetosB = [
+    { emoji: '⚽', nombre: 'Balón', correcto: true },
+    { emoji: '🍌', nombre: 'Banana', correcto: true },
+    { emoji: '🚲', nombre: 'Bicicleta', correcto: true },
+    { emoji: '🎈', nombre: 'Globo', correcto: false },
+    { emoji: '🌸', nombre: 'Flor', correcto: false },
+    { emoji: '🚗', nombre: 'Carro', correcto: false }
+];
+
+let items = [];
+let score = 0;
+let gameStarted = false;
+
+class Item {
+    constructor(obj, x, y) {
+        this.obj = obj;
+        this.x = x;
+        this.y = y;
+        this.size = 80;
+        this.found = false;
+        this.wobble = Math.random() * Math.PI * 2;
+    }
+    
+    draw() {
+        if (this.found && this.obj.correcto) {
+            ctx.globalAlpha = 0.3;
+        }
+        
+        // Efecto de movimiento
+        const offsetY = Math.sin(this.wobble) * 5;
+        
+        // Dibujar emoji
+        ctx.font = `${this.size}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.obj.emoji, this.x, this.y + offsetY);
+        
+        ctx.globalAlpha = 1;
+        
+        this.wobble += 0.05;
+    }
+    
+    isClicked(x, y) {
+        const dist = Math.sqrt((x - this.x) ** 2 + (y - this.y) ** 2);
+        return dist < this.size / 2;
+    }
+    
+    click() {
+        if (this.found) return;
+        
+        if (this.obj.correcto) {
+            this.found = true;
+            score++;
+            playSuccessSound();
+            showCelebration(`¡Bien! ${this.obj.emoji} ${this.obj.nombre}`);
+            
+            if (score === 3) {
+                setTimeout(() => {
+                    showCelebration('¡Completaste el juego! 🎉');
+                    setTimeout(resetGame, 2000);
+                }, 500);
+            }
+        } else {
+            // Efecto de error
+            const originalX = this.x;
+            for (let i = 0; i < 4; i++) {
+                setTimeout(() => {
+                    this.x = originalX + (i % 2 === 0 ? -10 : 10);
+                }, i * 50);
+            }
+            setTimeout(() => {
+                this.x = originalX;
+            }, 200);
+        }
+    }
+}
+
+function resetGame() {
+    items = [];
+    score = 0;
+    
+    // Mezclar objetos
+    const shuffled = [...objetosB].sort(() => Math.random() - 0.5);
+    
+    // Posicionar objetos en grid
+    const cols = 3;
+    const rows = 2;
+    const marginX = 150;
+    const marginY = 100;
+    const spacingX = (canvas.width - marginX * 2) / (cols - 1);
+    const spacingY = (canvas.height - marginY * 2) / (rows - 1);
+    
+    shuffled.forEach((obj, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = marginX + col * spacingX;
+        const y = marginY + row * spacingY;
+        items.push(new Item(obj, x, y));
+    });
+    
+    gameStarted = true;
+}
+
+function handleInput(e) {
+    e.preventDefault();
+    if (!gameStarted) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    items.forEach(item => {
+        if (item.isClicked(pos.x, pos.y)) {
+            item.click();
+        }
+    });
+}
+
+canvas.addEventListener('mousedown', handleInput);
+canvas.addEventListener('touchstart', handleInput);
+
+function gameLoop() {
+    // Fondo
+    ctx.fillStyle = '#FFF9C4';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Título
+    ctx.font = 'bold 40px Arial';
+    ctx.fillStyle = '#667eea';
+    ctx.textAlign = 'center';
+    ctx.fillText('Encuentra objetos con B', canvas.width / 2, 40);
+    
+    // Dibujar items
+    items.forEach(item => item.draw());
+    
+    // Puntuación
+    ctx.font = 'bold 35px Arial';
+    ctx.fillStyle = '#4CAF50';
+    ctx.textAlign = 'left';
+    ctx.fillText(`✓ ${score}/3`, 20, canvas.height - 20);
+    
+    requestAnimationFrame(gameLoop);
+}
+
+resetGame();
+gameLoop();
+</script>
+{% endblock %}

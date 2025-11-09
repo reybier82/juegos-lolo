@@ -1,0 +1,288 @@
+{%extends "base.html" %}
+
+{% block title %}Letra Q - Queso para Ratón{% endblock %}
+
+{% block content %}
+<div class="game-header">
+    <h1 class="game-title">🧀 Letra Q - Queso para Ratón</h1>
+    <p class="game-description">¡Arrastra el queso al ratón!</p>
+    <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
+</div>
+
+<div class="game-canvas-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+let score = 0;
+let isDragging = false;
+let gameWon = false;
+
+// Ratón (izquierda)
+const mouse = {
+    x: 120,
+    y: canvas.height / 2,
+    size: 100,
+    happy: false
+};
+
+// Queso (derecha, se puede arrastrar)
+const cheese = {
+    x: canvas.width - 150,
+    y: canvas.height / 2,
+    size: 80,
+    startX: canvas.width - 150,
+    startY: canvas.height / 2
+};
+
+// Dibujar ratón
+function drawMouse() {
+    const x = mouse.x;
+    const y = mouse.y;
+    const size = mouse.size;
+    
+    // Cuerpo
+    ctx.fillStyle = '#8B9DC3';
+    ctx.beginPath();
+    ctx.ellipse(x, y, size * 0.5, size * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cabeza
+    ctx.beginPath();
+    ctx.arc(x - size * 0.2, y - size * 0.1, size * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Orejas
+    ctx.fillStyle = '#A8B8D8';
+    ctx.beginPath();
+    ctx.ellipse(x - size * 0.35, y - size * 0.35, size * 0.2, size * 0.25, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.fillStyle = '#FFB6C1';
+    ctx.beginPath();
+    ctx.ellipse(x - size * 0.35, y - size * 0.35, size * 0.12, size * 0.18, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Nariz
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.ellipse(x - size * 0.45, y - size * 0.05, size * 0.08, size * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Ojos
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(x - size * 0.3, y - size * 0.2, size * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Boca (feliz si ganó)
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    if (mouse.happy) {
+        ctx.arc(x - size * 0.35, y, size * 0.15, 0.2, Math.PI - 0.2);
+    } else {
+        ctx.arc(x - size * 0.35, y + size * 0.05, size * 0.12, 0, Math.PI);
+    }
+    ctx.stroke();
+    
+    // Cola
+    ctx.strokeStyle = '#E8A5B8';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x + size * 0.5, y);
+    ctx.quadraticCurveTo(x + size * 0.7, y + size * 0.3, x + size * 0.8, y + size * 0.5);
+    ctx.stroke();
+    
+    // Letra Q en el ratón
+    ctx.font = 'bold 30px Arial';
+    ctx.fillStyle = '#FF6B6B';
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText('Q', x, y + size * 0.6);
+    ctx.fillText('Q', x, y + size * 0.6);
+}
+
+// Dibujar queso
+function drawCheese() {
+    const x = cheese.x;
+    const y = cheese.y;
+    const size = cheese.size;
+    
+    // Queso amarillo
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.moveTo(x - size * 0.5, y + size * 0.3);
+    ctx.lineTo(x - size * 0.3, y - size * 0.4);
+    ctx.lineTo(x + size * 0.3, y - size * 0.3);
+    ctx.lineTo(x + size * 0.5, y + size * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Borde del queso
+    ctx.strokeStyle = '#FFA500';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Agujeros del queso
+    ctx.fillStyle = '#FFE55C';
+    const holes = [
+        {x: x - size * 0.2, y: y - size * 0.1, r: size * 0.12},
+        {x: x + size * 0.15, y: y, r: size * 0.08},
+        {x: x, y: y + size * 0.15, r: size * 0.1}
+    ];
+    
+    holes.forEach(hole => {
+        ctx.beginPath();
+        ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    
+    // Letra Q en el queso
+    ctx.font = 'bold 35px Arial';
+    ctx.fillStyle = '#FF6B6B';
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 5;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText('Q', x, y - size * 0.6);
+    ctx.fillText('Q', x, y - size * 0.6);
+    
+    // Sombra si se está arrastrando
+    if (isDragging) {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetX = 5;
+        ctx.shadowOffsetY = 5;
+    }
+    ctx.shadowColor = 'transparent';
+}
+
+// Verificar si el queso está sobre el ratón
+function checkWin() {
+    const dist = Math.sqrt((cheese.x - mouse.x) ** 2 + (cheese.y - mouse.y) ** 2);
+    return dist < 100;
+}
+
+// Verificar si se hace click en el queso
+function isClickOnCheese(x, y) {
+    const dist = Math.sqrt((x - cheese.x) ** 2 + (y - cheese.y) ** 2);
+    return dist < cheese.size;
+}
+
+// Eventos de arrastre
+function startDrag(e) {
+    e.preventDefault();
+    const pos = getInputPosition(e, canvas);
+    
+    if (isClickOnCheese(pos.x, pos.y) && !gameWon) {
+        isDragging = true;
+    }
+}
+
+function drag(e) {
+    e.preventDefault();
+    if (!isDragging) return;
+    
+    const pos = getInputPosition(e, canvas);
+    cheese.x = pos.x;
+    cheese.y = pos.y;
+}
+
+function stopDrag(e) {
+    e.preventDefault();
+    if (!isDragging) return;
+    
+    isDragging = false;
+    
+    // Verificar si ganó
+    if (checkWin() && !gameWon) {
+        gameWon = true;
+        mouse.happy = true;
+        score++;
+        playSuccessSound();
+        showCelebration('¡Excelente! El ratón tiene su queso 🧀');
+        
+        // Reiniciar después de 2 segundos
+        setTimeout(() => {
+            gameWon = false;
+            mouse.happy = false;
+            cheese.x = cheese.startX;
+            cheese.y = cheese.startY;
+        }, 2000);
+    } else if (!gameWon) {
+        // Volver a la posición inicial si no llegó al ratón
+        cheese.x = cheese.startX;
+        cheese.y = cheese.startY;
+    }
+}
+
+// Mouse events
+canvas.addEventListener('mousedown', startDrag);
+canvas.addEventListener('mousemove', drag);
+canvas.addEventListener('mouseup', stopDrag);
+
+// Touch events
+canvas.addEventListener('touchstart', startDrag);
+canvas.addEventListener('touchmove', drag);
+canvas.addEventListener('touchend', stopDrag);
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    ctx.fillStyle = '#FFF9E6';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Suelo
+    ctx.fillStyle = '#D4A574';
+    ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
+    
+    // Instrucciones
+    if (score === 0 && !gameWon) {
+        ctx.font = 'bold 28px Arial';
+        ctx.fillStyle = '#667eea';
+        ctx.textAlign = 'center';
+        ctx.fillText('👆 Arrastra el queso al ratón', canvas.width / 2, 50);
+    }
+    
+    // Dibujar elementos
+    drawMouse();
+    drawCheese();
+    
+    // Puntuación
+    ctx.font = 'bold 40px Arial';
+    ctx.fillStyle = '#4CAF50';
+    ctx.textAlign = 'left';
+    ctx.fillText(`🧀 ${score}`, 20, canvas.height - 20);
+    
+    // Flecha indicadora (solo al inicio)
+    if (score === 0 && !gameWon && !isDragging) {
+        const time = Date.now() / 1000;
+        const arrowX = cheese.x - 80 + Math.sin(time * 3) * 10;
+        ctx.font = '50px Arial';
+        ctx.fillText('👉', arrowX, cheese.y);
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+{% endblock %}
