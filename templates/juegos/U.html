@@ -35,35 +35,51 @@ const mazeStartX = 100;
 const mazeStartY = 100;
 const mazeWidth = 600;
 const mazeHeight = 400;
-const pathWidth = 50;
+const pathWidth = 60; // Pasillos más anchos
 
 // Uva en la meta (esquina inferior derecha)
 const grapeX = mazeStartX + mazeWidth - 50;
 const grapeY = mazeStartY + mazeHeight - 50;
 
 // Letra U comienza en la esquina superior izquierda
-let letterUX = mazeStartX + 25;
-let letterUY = mazeStartY + 25;
+let letterUX = mazeStartX + 35;
+let letterUY = mazeStartY + 35;
 let isDrawing = false;
 let completed = false;
 let celebrationTimer = 0;
 
-// Definir paredes del laberinto (líneas)
+// Definir paredes del laberinto - Pasillos anchos con múltiples callejones
 const walls = [
     // Borde exterior
     { x1: mazeStartX, y1: mazeStartY, x2: mazeStartX + mazeWidth, y2: mazeStartY }, // Top
     { x1: mazeStartX + mazeWidth, y1: mazeStartY, x2: mazeStartX + mazeWidth, y2: mazeStartY + mazeHeight }, // Right
     { x1: mazeStartX + mazeWidth, y1: mazeStartY + mazeHeight, x2: mazeStartX, y2: mazeStartY + mazeHeight }, // Bottom
-    { x1: mazeStartX, y1: mazeStartY + mazeHeight, x2: mazeStartX, y2: mazeStartY + 50 }, // Left (con entrada)
+    { x1: mazeStartX, y1: mazeStartY + mazeHeight, x2: mazeStartX, y2: mazeStartY }, // Left
     
-    // Paredes internas (laberinto sencillo para niños)
-    { x1: mazeStartX + 150, y1: mazeStartY, x2: mazeStartX + 150, y2: mazeStartY + 100 },
-    { x1: mazeStartX, y1: mazeStartY + 150, x2: mazeStartX + 250, y2: mazeStartY + 150 },
-    { x1: mazeStartX + 250, y1: mazeStartY + 50, x2: mazeStartX + 250, y2: mazeStartY + 250 },
-    { x1: mazeStartX + 350, y1: mazeStartY + 150, x2: mazeStartX + 350, y2: mazeStartY + 400 },
-    { x1: mazeStartX + 150, y1: mazeStartY + 250, x2: mazeStartX + 450, y2: mazeStartY + 250 },
-    { x1: mazeStartX + 450, y1: mazeStartY + 50, x2: mazeStartX + 450, y2: mazeStartY + 200 },
-    { x1: mazeStartX + 500, y1: mazeStartY + 300, x2: mazeStartX + 600, y2: mazeStartY + 300 },
+    // Paredes internas - Pasillos de 70-80px de ancho
+    // Columna izquierda - Callejón sin salida arriba
+    { x1: mazeStartX + 120, y1: mazeStartY, x2: mazeStartX + 120, y2: mazeStartY + 100 },
+    
+    // Pared horizontal superior - Bloquea camino directo
+    { x1: mazeStartX, y1: mazeStartY + 170, x2: mazeStartX + 280, y2: mazeStartY + 170 },
+    
+    // Columna central izquierda - Callejón sin salida
+    { x1: mazeStartX + 240, y1: mazeStartY + 50, x2: mazeStartX + 240, y2: mazeStartY + 220 },
+    
+    // Pared horizontal central - Crea confusión
+    { x1: mazeStartX + 120, y1: mazeStartY + 260, x2: mazeStartX + 420, y2: mazeStartY + 260 },
+    
+    // Columna central - Divide el laberinto
+    { x1: mazeStartX + 340, y1: mazeStartY + 120, x2: mazeStartX + 340, y2: mazeStartY + 360 },
+    
+    // Pared horizontal inferior izquierda - Callejón sin salida
+    { x1: mazeStartX, y1: mazeStartY + 320, x2: mazeStartX + 220, y2: mazeStartY + 320 },
+    
+    // Columna derecha superior - Callejón sin salida
+    { x1: mazeStartX + 440, y1: mazeStartY + 50, x2: mazeStartX + 440, y2: mazeStartY + 200 },
+    
+    // Columna derecha inferior - Bloquea acceso directo a meta
+    { x1: mazeStartX + 520, y1: mazeStartY + 80, x2: mazeStartX + 520, y2: mazeStartY + 320 },
 ];
 
 // Función para obtener posición del input
@@ -99,9 +115,9 @@ function checkReachedGrape() {
     return distance < 40;
 }
 
-// Verificar colisión con paredes
+// Verificar colisión con paredes (mejorado)
 function checkWallCollision(x, y) {
-    const letterRadius = 20;
+    const letterRadius = 23; // Radio para U de tamaño normal
     
     for (let wall of walls) {
         const distance = distanceToLineSegment(x, y, wall.x1, wall.y1, wall.x2, wall.y2);
@@ -110,6 +126,26 @@ function checkWallCollision(x, y) {
         }
     }
     return false;
+}
+
+// Verificar si el movimiento es válido (previene atravesar paredes)
+function isValidMove(fromX, fromY, toX, toY) {
+    // Verificar la posición destino
+    if (checkWallCollision(toX, toY)) {
+        return false;
+    }
+    
+    // Verificar puntos intermedios (previene atravesar paredes rápidamente)
+    const steps = 5;
+    for (let i = 1; i <= steps; i++) {
+        const checkX = fromX + (toX - fromX) * (i / steps);
+        const checkY = fromY + (toY - fromY) * (i / steps);
+        if (checkWallCollision(checkX, checkY)) {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 // Calcular distancia de un punto a un segmento de línea
@@ -192,7 +228,7 @@ function drawGrape(x, y) {
     ctx.fill();
 }
 
-// Dibujar letra U (movible y más pequeña)
+// Dibujar letra U (tamaño normal)
 function drawLetterU(x, y) {
     // Círculo de fondo
     ctx.fillStyle = '#FFD700';
@@ -264,13 +300,13 @@ function handleMove(e) {
     
     const pos = getInputPosition(e, canvas);
     
-    // Verificar si la nueva posición colisiona con paredes
-    if (!checkWallCollision(pos.x, pos.y)) {
-        // Solo mover si no hay colisión
+    // Verificar si el movimiento es válido (incluye verificación de trayectoria)
+    if (isValidMove(letterUX, letterUY, pos.x, pos.y)) {
+        // Solo mover si el movimiento completo es válido
         letterUX = pos.x;
         letterUY = pos.y;
     }
-    // Si hay colisión, la letra U simplemente no se mueve
+    // Si hay colisión en cualquier punto del trayecto, la letra U no se mueve
     
     // Verificar si llegó a la uva
     if (checkReachedGrape()) {
