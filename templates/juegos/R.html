@@ -5,15 +5,360 @@
 {% block content %}
 <div class="game-header">
     <h1 class="game-title">🧩 Letra R - Rompecabezas</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <p class="game-description">¡Arrastra las piezas para formar la letra R!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Cargar imagen del rompecabezas
+const puzzleImg = new Image();
+puzzleImg.src = '/assets/img/r_rompecabezas.jpg';
+
+// Variables del juego
+let pieces = [];
+let draggedPiece = null;
+let offsetX = 0;
+let offsetY = 0;
+let completed = false;
+let celebrationTimer = 0;
+let glowIntensity = 0;
+
+// Configuración del rompecabezas
+const puzzleSize = 300; // Tamaño del área del rompecabezas completo
+const pieceSize = puzzleSize / 2; // 2x2 = 4 piezas
+const boardX = 50;
+const boardY = 150;
+
+// Inicializar piezas
+function initializePuzzle() {
+    pieces = [];
+    
+    // Crear 4 piezas (2x2)
+    for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 2; col++) {
+            const pieceIndex = row * 2 + col;
+            
+            pieces.push({
+                id: pieceIndex,
+                correctRow: row,
+                correctCol: col,
+                currentX: 450 + (col * 160), // Posición inicial (desordenadas a la derecha)
+                currentY: 150 + (row * 160),
+                targetX: boardX + col * pieceSize,
+                targetY: boardY + row * pieceSize,
+                placed: false,
+                dragging: false
+            });
+        }
+    }
+    
+    // Mezclar las piezas
+    for (let i = pieces.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        // Intercambiar posiciones iniciales
+        const tempX = pieces[i].currentX;
+        const tempY = pieces[i].currentY;
+        pieces[i].currentX = pieces[j].currentX;
+        pieces[i].currentY = pieces[j].currentY;
+        pieces[j].currentX = tempX;
+        pieces[j].currentY = tempY;
+    }
+}
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar pieza del rompecabezas
+function drawPiece(piece) {
+    if (!puzzleImg.complete) return;
+    
+    const x = piece.currentX;
+    const y = piece.currentY;
+    
+    // Sombra
+    if (!piece.placed) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(x + 5, y + 5, pieceSize, pieceSize);
+    }
+    
+    // Dibujar la porción de la imagen
+    ctx.save();
+    
+    // Borde si está siendo arrastrada
+    if (piece.dragging) {
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x - 2, y - 2, pieceSize + 4, pieceSize + 4);
+    }
+    
+    // Recortar y dibujar la porción correcta de la imagen
+    ctx.drawImage(
+        puzzleImg,
+        piece.correctCol * (puzzleImg.width / 2), // sx
+        piece.correctRow * (puzzleImg.height / 2), // sy
+        puzzleImg.width / 2, // sWidth
+        puzzleImg.height / 2, // sHeight
+        x, y, // dx, dy
+        pieceSize, pieceSize // dWidth, dHeight
+    );
+    
+    // Borde de la pieza
+    ctx.strokeStyle = piece.placed ? '#4CAF50' : '#FFFFFF';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, pieceSize, pieceSize);
+    
+    ctx.restore();
+}
+
+// Dibujar tablero guía
+function drawBoard() {
+    // Fondo del tablero
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.fillRect(boardX, boardY, puzzleSize, puzzleSize);
+    
+    // Líneas guía
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    
+    // Líneas verticales y horizontales
+    for (let i = 1; i < 2; i++) {
+        // Vertical
+        ctx.beginPath();
+        ctx.moveTo(boardX + i * pieceSize, boardY);
+        ctx.lineTo(boardX + i * pieceSize, boardY + puzzleSize);
+        ctx.stroke();
+        
+        // Horizontal
+        ctx.beginPath();
+        ctx.moveTo(boardX, boardY + i * pieceSize);
+        ctx.lineTo(boardX + puzzleSize, boardY + i * pieceSize);
+        ctx.stroke();
+    }
+    
+    ctx.setLineDash([]);
+    
+    // Borde del tablero
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(boardX, boardY, puzzleSize, puzzleSize);
+}
+
+// Manejar inicio de arrastre
+function handleStart(e) {
+    e.preventDefault();
+    if (completed) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    // Verificar si tocó alguna pieza (en orden inverso para priorizar las de arriba)
+    for (let i = pieces.length - 1; i >= 0; i--) {
+        const piece = pieces[i];
+        if (!piece.placed &&
+            pos.x >= piece.currentX && pos.x <= piece.currentX + pieceSize &&
+            pos.y >= piece.currentY && pos.y <= piece.currentY + pieceSize) {
+            
+            draggedPiece = piece;
+            piece.dragging = true;
+            offsetX = pos.x - piece.currentX;
+            offsetY = pos.y - piece.currentY;
+            
+            // Mover la pieza al final del array para dibujarla encima
+            pieces.splice(i, 1);
+            pieces.push(piece);
+            break;
+        }
+    }
+}
+
+// Manejar movimiento
+function handleMove(e) {
+    e.preventDefault();
+    if (!draggedPiece) return;
+    
+    const pos = getInputPosition(e, canvas);
+    draggedPiece.currentX = pos.x - offsetX;
+    draggedPiece.currentY = pos.y - offsetY;
+}
+
+// Manejar fin de arrastre
+function handleEnd(e) {
+    e.preventDefault();
+    if (!draggedPiece) return;
+    
+    const piece = draggedPiece;
+    piece.dragging = false;
+    
+    // Verificar si está cerca de su posición correcta
+    const distX = Math.abs(piece.currentX - piece.targetX);
+    const distY = Math.abs(piece.currentY - piece.targetY);
+    
+    if (distX < 40 && distY < 40) {
+        // Encajar la pieza
+        piece.currentX = piece.targetX;
+        piece.currentY = piece.targetY;
+        piece.placed = true;
+        
+        // Verificar si completó el rompecabezas
+        if (pieces.every(p => p.placed)) {
+            completed = true;
+            celebrationTimer = 0;
+        }
+    }
+    
+    draggedPiece = null;
+}
+
+// Event listeners
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Inicializar
+puzzleImg.onload = function() {
+    initializePuzzle();
+};
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#667eea');
+    gradient.addColorStop(1, '#764ba2');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Título
+    ctx.font = 'bold 36px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'center';
+    ctx.strokeText('🧩 Rompecabezas - Letra R', canvas.width / 2, 50);
+    ctx.fillText('🧩 Rompecabezas - Letra R', canvas.width / 2, 50);
+    
+    // Instrucciones
+    if (!completed) {
+        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.strokeText('Arrastra las piezas al tablero', canvas.width / 2, 90);
+        ctx.fillText('Arrastra las piezas al tablero', canvas.width / 2, 90);
+    }
+    
+    // Dibujar tablero guía
+    drawBoard();
+    
+    // Dibujar piezas
+    pieces.forEach(piece => drawPiece(piece));
+    
+    // Celebración
+    if (completed) {
+        celebrationTimer++;
+        glowIntensity = Math.sin(celebrationTimer * 0.1) * 0.5 + 0.5;
+        
+        // Efecto de brillo sobre el rompecabezas completado
+        ctx.save();
+        ctx.globalAlpha = glowIntensity * 0.3;
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(boardX - 10, boardY - 10, puzzleSize + 20, puzzleSize + 20);
+        ctx.restore();
+        
+        // Borde dorado brillante
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 8;
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 20 * glowIntensity;
+        ctx.strokeRect(boardX - 5, boardY - 5, puzzleSize + 10, puzzleSize + 10);
+        ctx.shadowBlur = 0;
+        
+        // Mensaje de felicitación
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
+        ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
+        
+        ctx.font = 'bold 30px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.strokeText('¡Completaste la letra R!', canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('¡Completaste la letra R!', canvas.width / 2, canvas.height / 2 + 20);
+        
+        // Estrellas brillantes
+        for (let i = 0; i < 20; i++) {
+            const angle = (celebrationTimer * 0.05 + i * 0.3) % (Math.PI * 2);
+            const radius = 150 + Math.sin(celebrationTimer * 0.1 + i) * 30;
+            const x = canvas.width / 2 + Math.cos(angle) * radius;
+            const y = canvas.height / 2 + Math.sin(angle) * radius;
+            const size = 3 + Math.sin(celebrationTimer * 0.2 + i) * 2;
+            
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Reiniciar después de 5 segundos
+        if (celebrationTimer > 300) {
+            completed = false;
+            celebrationTimer = 0;
+            glowIntensity = 0;
+            initializePuzzle();
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}

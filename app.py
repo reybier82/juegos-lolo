@@ -31,7 +31,7 @@ JUEGOS = {
     'O': {'nombre': 'El Oso Dormilón', 'descripcion': 'Di "OOOO" para despertar al oso'},
     'P': {'nombre': 'Juego de Memoria', 'descripcion': 'Encuentra los pares de la letra P'},
     'Q': {'nombre': 'Queso para Ratón', 'descripcion': 'Arrastra el queso al ratón'},
-    'R': {'nombre': 'Rompecabezas', 'descripcion': 'Arma el rompecabezas de la R'},
+    'R': {'nombre': 'Rompecabezas', 'descripcion': 'Arrastra las piezas para formar la letra R'},
     'S': {'nombre': 'Sonidos', 'descripcion': 'Escucha sonidos de animales con S'},
     'T': {'nombre': 'Tambor', 'descripcion': 'Toca el tambor y haz ritmos'},
     'U': {'nombre': 'Uvas para Contar', 'descripcion': 'Cuenta las uvas'},
