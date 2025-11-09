@@ -25,7 +25,7 @@ JUEGOS = {
     'I': {'nombre': 'Colorear la Isla', 'descripcion': 'Colorea todos los elementos de la isla'},
     'J': {'nombre': 'Lavar y Alimentar la Jirafa', 'descripcion': 'Lava a la jirafa con jabón y luego aliméntala'},
     'K': {'nombre': 'Sube al Koala', 'descripcion': 'Toca la K cuando se ilumine para ayudar al koala a subir'},
-    'L': {'nombre': 'Laberinto', 'descripcion': 'Sigue el camino de la letra L'},
+    'L': {'nombre': 'Enciende la Luna', 'descripcion': 'Frota la pantalla para limpiar las nubes y ver la luna'},
     'M': {'nombre': 'Mover Animales', 'descripcion': 'Mueve animales que empiezan con M'},
     'N': {'nombre': 'Números', 'descripcion': 'Cuenta con la letra N'},
     'O': {'nombre': 'Ordenar Círculos', 'descripcion': 'Ordena círculos con la letra O'},

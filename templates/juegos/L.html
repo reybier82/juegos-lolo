@@ -1,19 +1,351 @@
 {% extends "base.html" %}
 
-{% block title %}Letra L - Laberinto{% endblock %}
+{% block title %}Letra L - Enciende la Luna{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🌀 Letra L - Laberinto</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🌙 Letra L - Enciende la Luna</h1>
+    <p class="game-description">¡Frota la pantalla para limpiar las nubes y ver la luna!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let cloudCover = []; // Matriz de cobertura de nubes
+const gridSize = 10; // Tamaño de cada celda (más pequeño para suavidad)
+const cols = Math.ceil(canvas.width / gridSize);
+const rows = Math.ceil(canvas.height / gridSize);
+let cleanProgress = 0;
+let celebrating = false;
+let stars = [];
+
+// Inicializar la cobertura de nubes
+function initCloudCover() {
+    cloudCover = [];
+    for (let i = 0; i < rows; i++) {
+        cloudCover[i] = [];
+        for (let j = 0; j < cols; j++) {
+            cloudCover[i][j] = 1.5; // Más denso para que sea casi blanco
+        }
+    }
+}
+
+// Generar estrellas
+function generateStars() {
+    stars = [];
+    for (let i = 0; i < 100; i++) {
+        stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 1,
+            brightness: Math.random()
+        });
+    }
+}
+
+initCloudCover();
+generateStars();
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar cielo nocturno con estrellas
+function drawNightSky() {
+    // Cielo nocturno (gradiente)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#000428');
+    gradient.addColorStop(1, '#004e92');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Estrellas
+    stars.forEach(star => {
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+// Dibujar la luna real
+function drawMoonL() {
+    const moonColor = '#FFF8DC';
+    const moonGlow = '#FFFACD';
+    
+    ctx.save();
+    
+    // Dibujar la luna (círculo grande)
+    ctx.shadowColor = moonGlow;
+    ctx.shadowBlur = 40;
+    
+    ctx.fillStyle = moonColor;
+    ctx.beginPath();
+    ctx.arc(400, 250, 120, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cráteres en la luna
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(200, 200, 180, 0.4)';
+    ctx.beginPath();
+    ctx.arc(350, 220, 20, 0, Math.PI * 2);
+    ctx.arc(430, 240, 25, 0, Math.PI * 2);
+    ctx.arc(380, 290, 18, 0, Math.PI * 2);
+    ctx.arc(440, 280, 15, 0, Math.PI * 2);
+    ctx.arc(360, 270, 12, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// Dibujar las nubes con efecto de niebla suave
+function drawClouds() {
+    // Crear un canvas temporal para efecto de desenfoque
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Dibujar las nubes en el canvas temporal
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            if (cloudCover[i][j] > 0) {
+                const opacity = Math.min(1, cloudCover[i][j] * 0.9);
+                tempCtx.fillStyle = `rgba(240, 240, 250, ${opacity})`;
+                tempCtx.fillRect(j * gridSize, i * gridSize, gridSize, gridSize);
+            }
+        }
+    }
+    
+    // Aplicar desenfoque para efecto de niebla
+    ctx.save();
+    ctx.filter = 'blur(8px)';
+    ctx.drawImage(tempCanvas, 0, 0);
+    ctx.filter = 'none';
+    ctx.restore();
+}
+
+// Limpiar nubes en una posición
+function cleanClouds(x, y) {
+    const brushSize = 3; // Radio del pincel
+    const col = Math.floor(x / gridSize);
+    const row = Math.floor(y / gridSize);
+    
+    for (let i = row - brushSize; i <= row + brushSize; i++) {
+        for (let j = col - brushSize; j <= col + brushSize; j++) {
+            if (i >= 0 && i < rows && j >= 0 && j < cols) {
+                const distance = Math.sqrt((i - row) ** 2 + (j - col) ** 2);
+                if (distance <= brushSize) {
+                    cloudCover[i][j] = Math.max(0, cloudCover[i][j] - 0.2);
+                }
+            }
+        }
+    }
+    
+    // Calcular progreso solo en el área de la luna
+    const moonCenterX = 400;
+    const moonCenterY = 250;
+    const moonRadius = 120;
+    
+    let cleanedMoonCells = 0;
+    let totalMoonCells = 0;
+    
+    for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+            const cellX = j * gridSize + gridSize / 2;
+            const cellY = i * gridSize + gridSize / 2;
+            const distance = Math.sqrt((cellX - moonCenterX) ** 2 + (cellY - moonCenterY) ** 2);
+            
+            // Solo contar celdas dentro del área de la luna
+            if (distance <= moonRadius + 20) {
+                totalMoonCells++;
+                if (cloudCover[i][j] < 0.1) {
+                    cleanedMoonCells++;
+                }
+            }
+        }
+    }
+    
+    cleanProgress = totalMoonCells > 0 ? cleanedMoonCells / totalMoonCells : 0;
+    
+    // Verificar si la luna está completamente visible (95% descubierta)
+    if (cleanProgress > 0.95 && !celebrating) {
+        celebrating = true;
+        setTimeout(() => {
+            showCelebration();
+        }, 500);
+    }
+}
+
+// Variables para el arrastre
+let isDragging = false;
+
+// Manejo de eventos
+function handleStart(e) {
+    e.preventDefault();
+    if (celebrating) return;
+    isDragging = true;
+    const pos = getInputPosition(e, canvas);
+    cleanClouds(pos.x, pos.y);
+}
+
+function handleMove(e) {
+    e.preventDefault();
+    if (!isDragging || celebrating) return;
+    const pos = getInputPosition(e, canvas);
+    cleanClouds(pos.x, pos.y);
+}
+
+function handleEnd(e) {
+    e.preventDefault();
+    isDragging = false;
+}
+
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Mostrar celebración
+function showCelebration() {
+    console.log('🎉 ¡La luna está visible!');
+}
+
+// Reiniciar juego
+function resetGame() {
+    initCloudCover();
+    cleanProgress = 0;
+    celebrating = false;
+}
+
+// Animación de estrellas parpadeantes
+let frameCount = 0;
+function animateStars() {
+    frameCount++;
+    if (frameCount % 30 === 0) {
+        stars.forEach(star => {
+            if (Math.random() > 0.95) {
+                star.brightness = Math.random();
+            }
+        });
+    }
+}
+
+// Loop del juego
+function gameLoop() {
+    // Dibujar cielo nocturno
+    drawNightSky();
+    
+    // Dibujar la luna en forma de L
+    drawMoonL();
+    
+    // Dibujar las nubes encima
+    drawClouds();
+    
+    // Animar estrellas
+    animateStars();
+    
+    // Instrucciones
+    if (cleanProgress < 0.1 && !celebrating) {
+        ctx.font = 'bold 28px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 5;
+        ctx.textAlign = 'center';
+        ctx.strokeText('🌙 ¡Frota la pantalla para limpiar las nubes!', canvas.width / 2, 50);
+        ctx.fillText('🌙 ¡Frota la pantalla para limpiar las nubes!', canvas.width / 2, 50);
+    }
+    
+    // Barra de progreso
+    if (!celebrating && cleanProgress > 0.1) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(250, 30, 300, 25);
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(250, 30, 300 * cleanProgress, 25);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(250, 30, 300, 25);
+        
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${Math.floor(cleanProgress * 100)}%`, 400, 48);
+    }
+    
+    // Celebración
+    if (celebrating) {
+        // Fondo semi-transparente
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Mensaje
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        
+        ctx.font = 'bold 30px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.strokeText('¡La luna está brillando!', canvas.width / 2, canvas.height / 2 + 40);
+        ctx.fillText('¡La luna está brillando!', canvas.width / 2, canvas.height / 2 + 40);
+        
+        // Reiniciar después de 3 segundos
+        if (!resetGame.scheduled) {
+            resetGame.scheduled = true;
+            setTimeout(() => {
+                resetGame();
+                resetGame.scheduled = false;
+            }, 3000);
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}
