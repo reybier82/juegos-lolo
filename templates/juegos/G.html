@@ -5,7 +5,7 @@
 {% block content %}
 <div class="game-header">
     <h1 class="game-title">🐱 Letra G - El Ovillo del Gato</h1>
-    <p class="game-description">¡Traza el camino para que el ovillo llegue al gato!</p>
+    <p class="game-description">¡Traza la letra G para que el gato llegue al ovillo!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
@@ -32,30 +32,23 @@ window.addEventListener('resize', resizeCanvas);
 
 // Variables del juego
 let score = 0;
-let ballX = 120;  // Ovillo en esquina inferior IZQUIERDA (sobre el piso)
-let ballY = 480;
-let catX = 680;   // Gato en esquina superior DERECHA
-let catY = 120;
 let catMoving = false;
 let catProgress = 0;
 let pathCompleted = false;
-let isDrawing = false;
+let catDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 let celebrating = false;
-
-// Puntos del camino
-const pathPoints = [];
-const numPoints = 50;
+let maxTracedIndex = 0; // Índice máximo trazado por el usuario
 
 // Cargar imágenes
 const catImg = new Image();
 const ballImg = new Image();
-const floorImg = new Image();
 let catProcessed = null;
 let imagesLoaded = 0;
 
 catImg.src = "/assets/img/gato_ovillo.png";
 ballImg.src = "/assets/img/ovillo.webp";
-floorImg.src = "/assets/img/piso_gato.jpg";
 
 // Cargar audio del gato
 const catSound = new Audio('/assets/audio/gato.mp3');
@@ -106,45 +99,73 @@ ballImg.onload = () => {
     imagesLoaded++;
 };
 
-floorImg.onload = () => {
-    imagesLoaded++;
-};
+// Definir el camino de la letra G (forma de G mayúscula correcta)
+const letterGPath = [];
 
-// Generar camino curvo del gato al ovillo
-function generatePath() {
-    pathPoints.length = 0;
+function generateLetterGPath() {
+    letterGPath.length = 0;
     
-    // Inicio: Desde la PATA DELANTERA del gato (abajo del gato)
-    const startX = catX - 30;  // Un poco a la izquierda del centro
-    const startY = catY + 80;  // Abajo del gato (donde están las patas)
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const outerRadius = 180;
     
-    // Fin: DIRECTAMENTE AL OVILLO (centro del ovillo)
-    const endX = ballX;
-    const endY = ballY;  // Directamente al ovillo
+    // La G: Forma de C con barra horizontal interna
+    // INICIO: Punta superior derecha (donde está el gato)
+    // FIN: Punta de la barra horizontal izquierda (donde está el ovillo)
+    // DIRECCIÓN: ANTIHORARIO (contrario a las agujas del reloj) - SUBIR primero
     
-    for (let i = 0; i <= numPoints; i++) {
-        const t = i / numPoints;
-        
-        // Curva suave del gato al ovillo
-        const x = startX + (endX - startX) * t + Math.sin(t * Math.PI) * 100;
-        const y = startY + (endY - startY) * t;
-        
-        pathPoints.push({ 
-            x: x, 
-            y: y, 
-            traced: false 
-        });
+    // Recorrido completo en sentido ANTIHORARIO:
+    // Desde punta superior derecha → arriba → izquierda → abajo → derecha (hasta centro) → izquierda por la barra
+    
+    // Parte 1: Desde -60° (punta superior derecha MÁS ARRIBA) hacia arriba (sentido antihorario)
+    // Subimos desde -60° hasta -270° (que es lo mismo que 90°)
+    // Esto cubre: arriba → izquierda → abajo → derecha inferior
+    for (let angle = -Math.PI / 3; angle >= -3 * Math.PI / 2; angle -= 0.015) {
+        const x = centerX + Math.cos(angle) * outerRadius;
+        const y = centerY + Math.sin(angle) * outerRadius;
+        letterGPath.push({ x, y, traced: false });
+    }
+    
+    // Parte 2: Barra horizontal hacia la IZQUIERDA (donde está el ovillo)
+    // Desde el punto derecho del centro hacia la izquierda
+    const barLength = outerRadius * 0.7;
+    for (let i = 0; i <= 45; i++) {
+        const t = i / 45;
+        const x = centerX + outerRadius - t * barLength;
+        const y = centerY;
+        letterGPath.push({ x, y, traced: false });
     }
 }
 
-generatePath();
+generateLetterGPath();
+
+// Posiciones del gato y ovillo en los EXTREMOS CORRECTOS de la G
+let catX = letterGPath[0].x;  // INICIO: Punta superior izquierda
+let catY = letterGPath[0].y;
+let ballX = letterGPath[letterGPath.length - 1].x;  // FIN: Punta de la barra horizontal
+let ballY = letterGPath[letterGPath.length - 1].y;
+
+// Dibujar la letra G de fondo
+function drawLetterG() {
+    ctx.font = 'bold 500px Arial';
+    ctx.fillStyle = '#FFE0B2';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('G', canvas.width / 2, canvas.height / 2);
+}
+
+// Dibujar el camino de la G
+function drawPath() {
+    // NO DIBUJAR nada - ni línea gris ni línea verde
+    // El niño traza invisible sobre la letra G
+}
 
 // Dibujar el gato
 function drawCat() {
     if (imagesLoaded < 2 || !catProcessed) return;
     
-    const imgWidth = 200;
-    const imgHeight = 200;
+    const imgWidth = 120;
+    const imgHeight = 120;
     
     ctx.drawImage(
         catProcessed,
@@ -157,10 +178,10 @@ function drawCat() {
 
 // Dibujar el ovillo
 function drawBall() {
-    if (imagesLoaded < 3) return;
+    if (imagesLoaded < 2) return;
     
-    const imgWidth = 120;
-    const imgHeight = 120;
+    const imgWidth = 80;
+    const imgHeight = 80;
     
     ctx.drawImage(
         ballImg,
@@ -171,186 +192,103 @@ function drawBall() {
     );
 }
 
-// Dibujar el camino punteado (MEJORADO Y PROFESIONAL)
-function drawPath() {
-    // Sombra del camino para profundidad
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-    
-    // Camino punteado (no trazado) - Estilo profesional
-    ctx.strokeStyle = '#9E9E9E';
-    ctx.lineWidth = 10;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.setLineDash([20, 15]);
-    
-    ctx.beginPath();
-    for (let i = 0; i < pathPoints.length; i++) {
-        const point = pathPoints[i];
-        if (i === 0) {
-            ctx.moveTo(point.x, point.y);
-        } else {
-            ctx.lineTo(point.x, point.y);
-        }
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-    
-    // Resetear sombra
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-    
-    // Camino trazado (verde con degradado) - MUY PROFESIONAL
-    if (pathPoints.some(p => p.traced)) {
-        // Encontrar inicio y fin del camino trazado
-        let firstTraced = pathPoints.find(p => p.traced);
-        let lastTraced = [...pathPoints].reverse().find(p => p.traced);
-        
-        if (firstTraced && lastTraced) {
-            // Crear degradado del verde al amarillo
-            const gradient = ctx.createLinearGradient(
-                firstTraced.x, firstTraced.y,
-                lastTraced.x, lastTraced.y
-            );
-            gradient.addColorStop(0, '#4CAF50');
-            gradient.addColorStop(0.5, '#8BC34A');
-            gradient.addColorStop(1, '#CDDC39');
-            
-            // Sombra para el camino trazado
-            ctx.shadowColor = 'rgba(76, 175, 80, 0.4)';
-            ctx.shadowBlur = 10;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-            
-            // Línea exterior (borde)
-            ctx.strokeStyle = '#2E7D32';
-            ctx.lineWidth = 16;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            ctx.beginPath();
-            let hasStarted = false;
-            for (let i = 0; i < pathPoints.length; i++) {
-                const point = pathPoints[i];
-                if (point.traced) {
-                    if (!hasStarted) {
-                        ctx.moveTo(point.x, point.y);
-                        hasStarted = true;
-                    } else {
-                        ctx.lineTo(point.x, point.y);
-                    }
-                }
-            }
-            ctx.stroke();
-            
-            // Línea interior (degradado)
-            ctx.strokeStyle = gradient;
-            ctx.lineWidth = 12;
-            
-            ctx.beginPath();
-            hasStarted = false;
-            for (let i = 0; i < pathPoints.length; i++) {
-                const point = pathPoints[i];
-                if (point.traced) {
-                    if (!hasStarted) {
-                        ctx.moveTo(point.x, point.y);
-                        hasStarted = true;
-                    } else {
-                        ctx.lineTo(point.x, point.y);
-                    }
-                }
-            }
-            ctx.stroke();
-            
-            // Resetear sombra
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-        }
-    }
+// Detectar si el dedo está sobre el GATO
+function isOverCat(x, y) {
+    const distance = Math.sqrt((x - catX) ** 2 + (y - catY) ** 2);
+    return distance < 60;
 }
 
-// Detectar si el dedo está sobre el camino
-function isNearPath(x, y) {
-    for (let point of pathPoints) {
+// Detectar si el gato está cerca del ovillo
+function isCatNearBall() {
+    const distance = Math.sqrt((catX - ballX) ** 2 + (catY - ballY) ** 2);
+    return distance < 100;
+}
+
+// Encontrar el punto más cercano en el camino de la G
+function findClosestPathPoint(x, y) {
+    let closestPoint = null;
+    let minDist = Infinity;
+    let closestIndex = -1;
+    
+    for (let i = 0; i < letterGPath.length; i++) {
+        const point = letterGPath[i];
         const dist = Math.sqrt((x - point.x) ** 2 + (y - point.y) ** 2);
-        if (dist < 30) {
-            return point;
+        if (dist < minDist) {
+            minDist = dist;
+            closestPoint = point;
+            closestIndex = i;
         }
+    }
+    
+    // Solo retornar si está cerca del camino (dentro de la letra G)
+    if (minDist < 100) {
+        return { point: closestPoint, index: closestIndex };
     }
     return null;
 }
 
-// Manejo de eventos para trazar el camino
+// Manejo de eventos para ARRASTRAR el gato
 function handleStart(e) {
     e.preventDefault();
     if (pathCompleted || catMoving || celebrating) return;
     
     const pos = getInputPosition(e, canvas);
-    const nearPoint = isNearPath(pos.x, pos.y);
     
-    if (nearPoint) {
-        isDrawing = true;
-        nearPoint.traced = true;
+    // Verificar si tocó el gato
+    if (isOverCat(pos.x, pos.y)) {
+        catDragging = true;
+        dragOffsetX = pos.x - catX;
+        dragOffsetY = pos.y - catY;
+        console.log('🐱 Gato agarrado!');
     }
 }
 
 function handleMove(e) {
     e.preventDefault();
-    if (!isDrawing || pathCompleted || catMoving || celebrating) return;
+    if (!catDragging || pathCompleted || catMoving || celebrating) return;
     
     const pos = getInputPosition(e, canvas);
-    const nearPoint = isNearPath(pos.x, pos.y);
     
-    if (nearPoint) {
-        nearPoint.traced = true;
+    // Encontrar el punto más cercano en el camino de la G
+    const closest = findClosestPathPoint(pos.x, pos.y);
+    
+    if (closest) {
+        // Solo permitir avanzar en el camino (no retroceder)
+        // Y solo si está siguiendo el orden correcto
+        if (closest.index >= maxTracedIndex) {
+            maxTracedIndex = closest.index;
+            
+            // Marcar los puntos recorridos
+            for (let i = 0; i <= closest.index; i++) {
+                letterGPath[i].traced = true;
+            }
+        }
     }
 }
 
 function handleEnd(e) {
     e.preventDefault();
-    isDrawing = false;
     
-    if (pathCompleted || catMoving) return;
-    
-    // Verificar si la línea llegó cerca del ovillo
-    const lastTracedPoints = pathPoints.filter(p => p.traced);
-    
-    if (lastTracedPoints.length > 0) {
-        // Obtener el último punto trazado
-        const lastPoint = lastTracedPoints[lastTracedPoints.length - 1];
+    if (catDragging) {
+        catDragging = false;
+        console.log('🐱 Gato soltado!');
         
-        // Calcular distancia del último punto al ovillo
-        const distanceToTarget = Math.sqrt(
-            (lastPoint.x - ballX) ** 2 + 
-            (lastPoint.y - ballY) ** 2
-        );
+        // Verificar si trazó suficiente camino (al menos 80% del camino)
+        const percentageTraced = maxTracedIndex / letterGPath.length;
         
-        // Calcular porcentaje trazado
-        const percentage = lastTracedPoints.length / pathPoints.length;
-        
-        console.log('=== DEBUG ===');
-        console.log('Distancia al ovillo:', distanceToTarget.toFixed(0) + 'px');
-        console.log('Porcentaje trazado:', (percentage * 100).toFixed(1) + '%');
-        console.log('Último punto:', lastPoint.x.toFixed(0), lastPoint.y.toFixed(0));
-        console.log('Ovillo en:', ballX, ballY);
-        
-        // MUY FLEXIBLE: Si la línea llegó cerca del ovillo (menos de 150px) y trazó al menos 50%
-        if (distanceToTarget < 150 && percentage > 0.50 && !pathCompleted) {
+        if (percentageTraced >= 0.8) {
             pathCompleted = true;
-            console.log('✅ ¡CAMINO COMPLETADO! El gato va a caminar.');
+            console.log('✅ ¡Trazo completado! El gato va a caminar.');
             
-            // Iniciar movimiento del gato inmediatamente
             setTimeout(() => {
                 catMoving = true;
                 catProgress = 0;
-                console.log('🐱 Gato empezando a caminar...');
-            }, 200);
+            }, 300);
         } else {
-            console.log('❌ No cumple condiciones. Distancia:', distanceToTarget.toFixed(0), 'Porcentaje:', (percentage * 100).toFixed(1) + '%');
+            console.log('❌ Debes trazar más de la G. Intenta de nuevo.');
+            // Resetear el trazo
+            maxTracedIndex = 0;
+            letterGPath.forEach(p => p.traced = false);
         }
     }
 }
@@ -362,24 +300,10 @@ canvas.addEventListener('touchstart', handleStart);
 canvas.addEventListener('touchmove', handleMove);
 canvas.addEventListener('touchend', handleEnd);
 
-// Reiniciar juego
-function resetGame() {
-    catX = 680;   // Esquina superior DERECHA
-    catY = 120;
-    ballX = 120;  // Esquina inferior IZQUIERDA
-    ballY = 480;
-    catMoving = false;
-    catProgress = 0;
-    pathCompleted = false;
-    isDrawing = false;
-    celebrating = false;
-    generatePath();
-}
-
 // Actualizar movimiento del gato
 function updateCatMovement() {
     if (catMoving && !celebrating) {
-        catProgress += 0.02;  // Velocidad del gato
+        catProgress += 0.015;
         
         if (catProgress >= 1) {
             catProgress = 1;
@@ -387,11 +311,9 @@ function updateCatMovement() {
             celebrating = true;
             score++;
             
-            // Posicionar el gato ENCIMA del ovillo al final
             catX = ballX;
-            catY = ballY - 80;  // Encima del ovillo (ajustado)
+            catY = ballY - 40;
             
-            // Reproducir sonido del gato
             try {
                 catSound.currentTime = 0;
                 catSound.volume = 1.0;
@@ -402,29 +324,41 @@ function updateCatMovement() {
             
             showCelebration('¡El gato llegó al ovillo! 🐱🧶');
             
-            // Reiniciar después de 3 segundos
             setTimeout(() => {
                 resetGame();
             }, 3000);
         } else {
-            // Mover el gato a lo largo del camino
-            const index = Math.floor(catProgress * (pathPoints.length - 1));
-            const point = pathPoints[index];
+            const index = Math.floor(catProgress * (letterGPath.length - 1));
+            const point = letterGPath[index];
             if (point) {
-                // Ajustar posición: el gato se mueve desde su centro, no desde las patas
-                catX = point.x + 30;  // Compensar el offset inicial
-                catY = point.y - 80;  // Compensar para que las patas sigan el camino
+                catX = point.x;
+                catY = point.y;
             }
         }
     }
 }
 
+// Reiniciar juego
+function resetGame() {
+    catX = letterGPath[0].x;
+    catY = letterGPath[0].y;
+    ballX = letterGPath[letterGPath.length - 1].x;
+    ballY = letterGPath[letterGPath.length - 1].y;
+    catMoving = false;
+    catProgress = 0;
+    pathCompleted = false;
+    catDragging = false;
+    celebrating = false;
+    maxTracedIndex = 0;
+    
+    // Resetear trazado
+    letterGPath.forEach(p => p.traced = false);
+}
+
 // Loop del juego
 function gameLoop() {
-    // Verificar que las imágenes estén cargadas (ahora son 3: gato, ovillo, piso)
-    if (imagesLoaded < 3) {
-        // Mostrar mensaje de carga
-        ctx.fillStyle = '#FFF9C4';
+    if (imagesLoaded < 2) {
+        ctx.fillStyle = '#FFF3E0';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.font = 'bold 30px Arial';
         ctx.fillStyle = '#6A1B9A';
@@ -434,43 +368,30 @@ function gameLoop() {
         return;
     }
     
-    // Fondo (pared amarilla suave)
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, '#FFF9C4');
-    gradient.addColorStop(1, '#FFECB3');
-    ctx.fillStyle = gradient;
+    // Fondo
+    ctx.fillStyle = '#FFF3E0';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Piso de madera (IMAGEN REAL)
-    const floorHeight = 150;
-    const floorY = canvas.height - floorHeight;
+    // Letra G de fondo
+    drawLetterG();
     
-    // Dibujar la imagen del piso
-    ctx.drawImage(
-        floorImg,
-        0,
-        floorY,
-        canvas.width,
-        floorHeight
-    );
-    
-    // Actualizar movimiento del gato
+    // Actualizar movimiento
     updateCatMovement();
     
-    // IMPORTANTE: Dibujar elementos DESPUÉS del piso (z-index mayor)
-    drawPath();  // Camino punteado
-    drawBall();  // Ovillo en el piso
-    drawCat();   // Gato se mueve por el camino
+    // Dibujar elementos
+    drawPath();
+    drawBall();
+    drawCat();
     
     // Instrucciones
     if (score === 0 && !pathCompleted && !celebrating) {
-        ctx.font = 'bold 26px Arial';
+        ctx.font = 'bold 24px Arial';
         ctx.fillStyle = '#6A1B9A';
         ctx.strokeStyle = 'white';
         ctx.lineWidth = 5;
         ctx.textAlign = 'center';
-        ctx.strokeText('¡Traza el camino para que el gato llegue al ovillo!', canvas.width / 2, 40);
-        ctx.fillText('¡Traza el camino para que el gato llegue al ovillo!', canvas.width / 2, 40);
+        ctx.strokeText('¡Traza la letra G para que el gato llegue al ovillo!', canvas.width / 2, 40);
+        ctx.fillText('¡Traza la letra G para que el gato llegue al ovillo!', canvas.width / 2, 40);
     }
     
     // Puntuación
@@ -485,7 +406,6 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Iniciar juego
 gameLoop();
 </script>
 {% endblock %}
