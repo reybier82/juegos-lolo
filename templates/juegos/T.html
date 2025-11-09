@@ -92,13 +92,13 @@ function drawSadTurtle() {
     // Cuerpo (verde)
     ctx.fillStyle = '#7CB342';
     
-    // Cabeza
+    // Cabeza más separada
     ctx.beginPath();
-    ctx.arc(turtleX - 60, turtleY, 30, 0, Math.PI * 2);
+    ctx.arc(turtleX - 100, turtleY, 35, 0, Math.PI * 2);
     ctx.fill();
     
-    // Cuello
-    ctx.fillRect(turtleX - 70, turtleY - 10, 30, 20);
+    // Cuello más largo
+    ctx.fillRect(turtleX - 100, turtleY - 10, 40, 20);
     
     // Cuerpo principal (sin caparazón)
     ctx.fillStyle = '#9CCC65';
@@ -138,26 +138,26 @@ function drawSadTurtle() {
     // Ojos tristes
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.arc(turtleX - 70, turtleY - 5, 6, 0, Math.PI * 2);
+    ctx.arc(turtleX - 110, turtleY - 8, 7, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(turtleX - 55, turtleY - 5, 6, 0, Math.PI * 2);
+    ctx.arc(turtleX - 90, turtleY - 8, 7, 0, Math.PI * 2);
     ctx.fill();
     
     // Pupilas mirando hacia abajo (triste)
     ctx.fillStyle = '#000000';
     ctx.beginPath();
-    ctx.arc(turtleX - 70, turtleY - 2, 3, 0, Math.PI * 2);
+    ctx.arc(turtleX - 110, turtleY - 5, 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(turtleX - 55, turtleY - 2, 3, 0, Math.PI * 2);
+    ctx.arc(turtleX - 90, turtleY - 5, 3, 0, Math.PI * 2);
     ctx.fill();
     
     // Boca triste
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(turtleX - 62, turtleY + 8, 8, 0.2, Math.PI - 0.2);
+    ctx.arc(turtleX - 100, turtleY + 10, 10, 0.2, Math.PI - 0.2);
     ctx.stroke();
 }
 
@@ -166,13 +166,13 @@ function drawHappyTurtle() {
     // Cuerpo (verde)
     ctx.fillStyle = '#7CB342';
     
-    // Cabeza
+    // Cabeza más separada
     ctx.beginPath();
-    ctx.arc(turtleX - 60, turtleY, 30, 0, Math.PI * 2);
+    ctx.arc(turtleX - 100, turtleY, 35, 0, Math.PI * 2);
     ctx.fill();
     
-    // Cuello
-    ctx.fillRect(turtleX - 70, turtleY - 10, 30, 20);
+    // Cuello más largo
+    ctx.fillRect(turtleX - 100, turtleY - 10, 40, 20);
     
     // Caparazón con letra T
     const gradient = ctx.createRadialGradient(turtleX - 10, turtleY - 10, 10, turtleX, turtleY, 70);
@@ -234,26 +234,26 @@ function drawHappyTurtle() {
     // Ojos felices
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.arc(turtleX - 70, turtleY - 5, 6, 0, Math.PI * 2);
+    ctx.arc(turtleX - 110, turtleY - 8, 7, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(turtleX - 55, turtleY - 5, 6, 0, Math.PI * 2);
+    ctx.arc(turtleX - 90, turtleY - 8, 7, 0, Math.PI * 2);
     ctx.fill();
     
     // Pupilas
     ctx.fillStyle = '#000000';
     ctx.beginPath();
-    ctx.arc(turtleX - 70, turtleY - 5, 3, 0, Math.PI * 2);
+    ctx.arc(turtleX - 110, turtleY - 8, 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(turtleX - 55, turtleY - 5, 3, 0, Math.PI * 2);
+    ctx.arc(turtleX - 90, turtleY - 8, 3, 0, Math.PI * 2);
     ctx.fill();
     
     // Sonrisa
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(turtleX - 62, turtleY + 5, 8, 0, Math.PI);
+    ctx.arc(turtleX - 100, turtleY + 8, 10, 0, Math.PI);
     ctx.stroke();
 }
 
