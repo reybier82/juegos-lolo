@@ -1,19 +1,543 @@
 {% extends "base.html" %}
 
-{% block title %}Letra O - Ordenar Círculos{% endblock %}
+{% block title %}Letra O - El Oso Dormilón{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">⭕ Letra O - Ordenar Círculos</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🐻 Letra O - El Oso Dormilón</h1>
+    <p class="game-description">¡Di "OOOO" para despertar al oso!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let gameState = 'sleeping'; // 'sleeping', 'waking', 'greeting', 'complete'
+let volumeLevel = 0;
+let maxVolume = 0;
+let wakeProgress = 0;
+let greetingTimer = 0;
+let mouthAnimation = 0;
+let eyeOpenProgress = 0;
+let audioContext = null;
+let analyser = null;
+let microphone = null;
+let dataArray = null;
+let micPermissionGranted = false;
+
+// Audio del saludo
+const greetingAudio = new Audio('/assets/audio/saludo_oso.mp3');
+
+// Solicitar permiso del micrófono
+async function requestMicrophone() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+        micPermissionGranted = true;
+        console.log('Micrófono activado');
+    } catch (err) {
+        console.error('Error al acceder al micrófono:', err);
+        alert('Por favor, permite el acceso al micrófono para jugar.');
+    }
+}
+
+// Detectar volumen del micrófono
+function getVolume() {
+    if (!analyser || !dataArray) return 0;
+    analyser.getByteFrequencyData(dataArray);
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+    }
+    return sum / dataArray.length / 255; // Normalizar entre 0 y 1
+}
+
+// Detectar si se pronuncia "O"
+function detectOSound() {
+    if (!analyser || !dataArray) return false;
+    analyser.getByteFrequencyData(dataArray);
+    
+    // Detectar frecuencias bajas/medias típicas de la vocal "O"
+    // La "O" tiene frecuencias dominantes alrededor de 400-600 Hz
+    let lowFreqSum = 0;
+    let midFreqSum = 0;
+    
+    // Primeros 30% del espectro (frecuencias bajas)
+    for (let i = 0; i < dataArray.length * 0.3; i++) {
+        lowFreqSum += dataArray[i];
+    }
+    
+    // 30-60% del espectro (frecuencias medias)
+    for (let i = Math.floor(dataArray.length * 0.3); i < dataArray.length * 0.6; i++) {
+        midFreqSum += dataArray[i];
+    }
+    
+    const avgLow = lowFreqSum / (dataArray.length * 0.3);
+    const avgMid = midFreqSum / (dataArray.length * 0.3);
+    
+    // Umbrales más bajos para facilitar la detección
+    return avgLow > 20 && avgMid > 15 && volumeLevel > 0.1;
+}
+
+// Dibujar cueva
+function drawCave() {
+    // Cueva realista
+    ctx.fillStyle = '#2C1810';
+    ctx.beginPath();
+    ctx.ellipse(400, 380, 200, 140, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Borde más oscuro de la cueva
+    ctx.strokeStyle = '#1a0f0a';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+    
+    // Interior más oscuro
+    ctx.fillStyle = '#1a0f0a';
+    ctx.beginPath();
+    ctx.ellipse(400, 380, 180, 120, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Textura de roca
+    ctx.fillStyle = '#4a3528';
+    for (let i = 0; i < 20; i++) {
+        const x = 400 + (Math.random() - 0.5) * 350;
+        const y = 380 + (Math.random() - 0.5) * 250;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.random() * 10 + 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// Dibujar oso dormido
+function drawSleepingBear() {
+    const bearX = 400;
+    const bearY = 380;
+    
+    // Cuerpo del oso
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.ellipse(bearX, bearY, 80, 60, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cabeza
+    ctx.fillStyle = '#A0522D';
+    ctx.beginPath();
+    ctx.arc(bearX, bearY - 40, 50, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Orejas
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.arc(bearX - 35, bearY - 65, 20, 0, Math.PI * 2);
+    ctx.arc(bearX + 35, bearY - 65, 20, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Interior de orejas
+    ctx.fillStyle = '#D2691E';
+    ctx.beginPath();
+    ctx.arc(bearX - 35, bearY - 65, 12, 0, Math.PI * 2);
+    ctx.arc(bearX + 35, bearY - 65, 12, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Hocico
+    ctx.fillStyle = '#D2B48C';
+    ctx.beginPath();
+    ctx.ellipse(bearX, bearY - 25, 30, 25, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Nariz
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(bearX, bearY - 35, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Ojos cerrados
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bearX - 20, bearY - 50);
+    ctx.lineTo(bearX - 10, bearY - 50);
+    ctx.moveTo(bearX + 10, bearY - 50);
+    ctx.lineTo(bearX + 20, bearY - 50);
+    ctx.stroke();
+    
+    // Zzz (dormido)
+    ctx.font = 'bold 30px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    const zOffset = Math.sin(Date.now() / 500) * 5;
+    ctx.strokeText('Z', bearX + 70, bearY - 80 + zOffset);
+    ctx.fillText('Z', bearX + 70, bearY - 80 + zOffset);
+    ctx.font = 'bold 24px Arial';
+    ctx.strokeText('z', bearX + 85, bearY - 100 + zOffset);
+    ctx.fillText('z', bearX + 85, bearY - 100 + zOffset);
+    ctx.font = 'bold 18px Arial';
+    ctx.strokeText('z', bearX + 95, bearY - 115 + zOffset);
+    ctx.fillText('z', bearX + 95, bearY - 115 + zOffset);
+}
+
+// Dibujar oso despertando
+function drawWakingBear() {
+    const bearX = 400;
+    const bearY = 380;
+    
+    // Cuerpo del oso
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.ellipse(bearX, bearY, 80, 60, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cabeza
+    ctx.fillStyle = '#A0522D';
+    ctx.beginPath();
+    ctx.arc(bearX, bearY - 40, 50, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Orejas
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.arc(bearX - 35, bearY - 65, 20, 0, Math.PI * 2);
+    ctx.arc(bearX + 35, bearY - 65, 20, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Interior de orejas
+    ctx.fillStyle = '#D2691E';
+    ctx.beginPath();
+    ctx.arc(bearX - 35, bearY - 65, 12, 0, Math.PI * 2);
+    ctx.arc(bearX + 35, bearY - 65, 12, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Hocico
+    ctx.fillStyle = '#D2B48C';
+    ctx.beginPath();
+    ctx.ellipse(bearX, bearY - 25, 30, 25, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Nariz
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(bearX, bearY - 35, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Ojos abriéndose
+    if (eyeOpenProgress < 1) {
+        eyeOpenProgress += 0.02;
+    }
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(bearX - 15, bearY - 50, 8, 8 * eyeOpenProgress, 0, 0, Math.PI * 2);
+    ctx.ellipse(bearX + 15, bearY - 50, 8, 8 * eyeOpenProgress, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pupilas
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(bearX - 15, bearY - 50, 4 * eyeOpenProgress, 0, Math.PI * 2);
+    ctx.arc(bearX + 15, bearY - 50, 4 * eyeOpenProgress, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Boca bostezando
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const mouthOpen = Math.sin(Date.now() / 200) * 10 + 10;
+    ctx.ellipse(bearX, bearY - 20, 15, mouthOpen, 0, 0, Math.PI);
+    ctx.stroke();
+}
+
+// Dibujar oso saludando
+function drawGreetingBear() {
+    const bearX = 400;
+    const bearY = 380;
+    
+    // Cuerpo del oso
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.ellipse(bearX, bearY, 80, 60, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Brazo levantado (saludando)
+    const armWave = Math.sin(Date.now() / 200) * 0.3;
+    ctx.save();
+    ctx.translate(bearX - 60, bearY - 20);
+    ctx.rotate(-0.5 + armWave);
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(0, 0, 15, 40);
+    ctx.beginPath();
+    ctx.arc(7.5, 40, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    
+    // Cabeza
+    ctx.fillStyle = '#A0522D';
+    ctx.beginPath();
+    ctx.arc(bearX, bearY - 40, 50, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Orejas
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.arc(bearX - 35, bearY - 65, 20, 0, Math.PI * 2);
+    ctx.arc(bearX + 35, bearY - 65, 20, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Interior de orejas
+    ctx.fillStyle = '#D2691E';
+    ctx.beginPath();
+    ctx.arc(bearX - 35, bearY - 65, 12, 0, Math.PI * 2);
+    ctx.arc(bearX + 35, bearY - 65, 12, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Hocico
+    ctx.fillStyle = '#D2B48C';
+    ctx.beginPath();
+    ctx.ellipse(bearX, bearY - 25, 30, 25, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Nariz
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(bearX, bearY - 35, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Ojos felices
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(bearX - 15, bearY - 50, 5, 0, Math.PI * 2);
+    ctx.arc(bearX + 15, bearY - 50, 5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Boca hablando (animada)
+    mouthAnimation = (mouthAnimation + 0.2) % (Math.PI * 2);
+    const mouthSize = Math.abs(Math.sin(mouthAnimation)) * 15 + 5;
+    
+    ctx.fillStyle = '#8B0000';
+    ctx.beginPath();
+    ctx.ellipse(bearX, bearY - 15, 20, mouthSize, 0, 0, Math.PI);
+    ctx.fill();
+    
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(bearX, bearY - 15, 20, mouthSize, 0, 0, Math.PI);
+    ctx.stroke();
+}
+
+// Solicitar micrófono al inicio
+requestMicrophone();
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#1a1a2e');
+    gradient.addColorStop(1, '#16213e');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Estrellas
+    ctx.fillStyle = '#FFFFFF';
+    for (let i = 0; i < 50; i++) {
+        const x = (i * 137.5) % canvas.width;
+        const y = (i * 73.2) % 300;
+        const size = (i % 3) + 1;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Montañas
+    ctx.fillStyle = '#0f3460';
+    ctx.beginPath();
+    ctx.moveTo(0, 500);
+    ctx.lineTo(200, 350);
+    ctx.lineTo(400, 450);
+    ctx.lineTo(600, 320);
+    ctx.lineTo(800, 480);
+    ctx.lineTo(800, 600);
+    ctx.lineTo(0, 600);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Suelo
+    ctx.fillStyle = '#2d4a3e';
+    ctx.fillRect(0, 500, canvas.width, 100);
+    
+    // Pasto
+    ctx.strokeStyle = '#1a3a2e';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < canvas.width; i += 15) {
+        ctx.beginPath();
+        ctx.moveTo(i, 500);
+        ctx.lineTo(i + 7, 510);
+        ctx.stroke();
+    }
+    
+    // Dibujar cueva
+    drawCave();
+    
+    // Letra O grande en la esquina
+    ctx.font = 'bold 100px Arial';
+    ctx.fillStyle = '#FFD700';
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 5;
+    ctx.strokeText('O', 50, 100);
+    ctx.fillText('O', 50, 100);
+    
+    if (gameState === 'sleeping') {
+        drawSleepingBear();
+        
+        // Obtener volumen del micrófono
+        volumeLevel = getVolume();
+        maxVolume = Math.max(maxVolume, volumeLevel);
+        
+        // Detectar sonido "O" - más rápido para completar en ~7 segundos
+        if (detectOSound()) {
+            wakeProgress += 0.025; // Incremento más rápido (7 segundos aprox)
+        } else {
+            wakeProgress = Math.max(0, wakeProgress - 0.005); // Decremento más lento
+        }
+        
+        // Instrucciones
+        ctx.font = 'bold 28px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.strokeText('🎤 ¡Di "OOOO" para despertar al oso!', canvas.width / 2, 50);
+        ctx.fillText('🎤 ¡Di "OOOO" para despertar al oso!', canvas.width / 2, 50);
+        
+        // Medidor de volumen
+        const meterWidth = 300;
+        const meterHeight = 30;
+        const meterX = (canvas.width - meterWidth) / 2;
+        const meterY = 520;
+        
+        // Fondo del medidor
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(meterX, meterY, meterWidth, meterHeight);
+        
+        // Barra de progreso
+        const progressColor = wakeProgress > 0.7 ? '#4CAF50' : wakeProgress > 0.4 ? '#FFA500' : '#FF5722';
+        ctx.fillStyle = progressColor;
+        ctx.fillRect(meterX, meterY, meterWidth * wakeProgress, meterHeight);
+        
+        // Borde del medidor
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(meterX, meterY, meterWidth, meterHeight);
+        
+        // Texto del medidor
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${Math.floor(wakeProgress * 100)}%`, canvas.width / 2, meterY + 20);
+        
+        // Cambiar a estado "waking" cuando llegue al 100%
+        if (wakeProgress >= 1) {
+            gameState = 'waking';
+            eyeOpenProgress = 0;
+        }
+        
+    } else if (gameState === 'waking') {
+        drawWakingBear();
+        
+        greetingTimer++;
+        
+        // Después de 2 segundos, cambiar a saludo
+        if (greetingTimer > 120) {
+            gameState = 'greeting';
+            greetingTimer = 0;
+            greetingAudio.play();
+        }
+        
+    } else if (gameState === 'greeting') {
+        drawGreetingBear();
+        
+        greetingTimer++;
+        
+        // Mensaje
+        ctx.font = 'bold 32px Arial';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 5;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡El oso despertó!', canvas.width / 2, 50);
+        ctx.fillText('¡El oso despertó!', canvas.width / 2, 50);
+        
+        // Después del audio (aprox 3 segundos), cambiar a complete
+        if (greetingTimer > 180) {
+            gameState = 'complete';
+            greetingTimer = 0;
+        }
+        
+    } else if (gameState === 'complete') {
+        drawGreetingBear();
+        
+        greetingTimer++;
+        
+        // Celebración
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        
+        ctx.font = 'bold 30px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.strokeText('¡Despertaste al oso con la letra O!', canvas.width / 2, canvas.height / 2 + 40);
+        ctx.fillText('¡Despertaste al oso con la letra O!', canvas.width / 2, canvas.height / 2 + 40);
+        
+        // Reiniciar después de 3 segundos
+        if (greetingTimer > 180) {
+            gameState = 'sleeping';
+            wakeProgress = 0;
+            greetingTimer = 0;
+            volumeLevel = 0;
+            maxVolume = 0;
+            eyeOpenProgress = 0;
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}
