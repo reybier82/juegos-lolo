@@ -1,19 +1,463 @@
 {% extends "base.html" %}
 
-{% block title %}Letra H - Hacer Música{% endblock %}
+{% block title %}Letra H - ¡Enciende la Hélice!{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🎵 Letra H - Hacer Música</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🚁 Letra H - ¡Enciende la Hélice!</h1>
+    <p class="game-description">¡Gira la hélice muy rápido para hacer volar el helicóptero!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let score = 0;
+let helicopterY = 420; // Más abajo, sobre la plataforma
+let helicopterX = 400;
+let propellerRotation = 0;
+let propellerSpeed = 0;
+let isSpinning = false;
+let isTakingOff = false;
+let celebrating = false;
+let shakeAmount = 0;
+const groundY = 500; // Altura del suelo
+
+// Variables para detectar gestos circulares
+let touchPoints = [];
+let lastAngle = null;
+let totalRotation = 0;
+let rotationThreshold = Math.PI * 6; // 3 vueltas completas
+
+// Audio del helicóptero
+const helicopterSound = new Audio('/assets/audio/helicoptero.mp3');
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar el helicóptero
+function drawHelicopter() {
+    const shake = celebrating ? 0 : shakeAmount;
+    const shakeX = (Math.random() - 0.5) * shake;
+    const shakeY = (Math.random() - 0.5) * shake;
+    
+    const x = helicopterX + shakeX;
+    const y = helicopterY + shakeY;
+    
+    // Cuerpo principal (cabina)
+    ctx.fillStyle = '#2196F3';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 80, 50, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Ventana
+    ctx.fillStyle = '#81D4FA';
+    ctx.beginPath();
+    ctx.ellipse(x - 10, y, 35, 25, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cola
+    ctx.fillStyle = '#1976D2';
+    ctx.beginPath();
+    ctx.moveTo(x + 70, y);
+    ctx.lineTo(x + 150, y - 10);
+    ctx.lineTo(x + 150, y + 10);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Hélice trasera pequeña
+    ctx.save();
+    ctx.translate(x + 150, y);
+    ctx.rotate(propellerRotation * 2);
+    ctx.fillStyle = '#FF9800';
+    ctx.fillRect(-3, -15, 6, 30);
+    ctx.fillRect(-15, -3, 30, 6);
+    ctx.restore();
+    
+    // Patines
+    ctx.strokeStyle = '#424242';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x - 50, y + 60);
+    ctx.lineTo(x + 30, y + 60);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - 30, y + 45);
+    ctx.lineTo(x - 40, y + 60);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + 45);
+    ctx.lineTo(x + 20, y + 60);
+    ctx.stroke();
+}
+
+// Dibujar la hélice (letra H)
+function drawPropeller() {
+    const shake = celebrating ? 0 : shakeAmount;
+    const shakeX = (Math.random() - 0.5) * shake;
+    const shakeY = (Math.random() - 0.5) * shake;
+    
+    const x = helicopterX + shakeX;
+    const y = helicopterY + shakeY - 80;
+    
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(propellerRotation);
+    
+    // Dibujar la letra H como hélice
+    ctx.fillStyle = '#FF5722';
+    ctx.font = 'bold 120px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Sombra para efecto de movimiento
+    if (propellerSpeed > 0.1) {
+        ctx.shadowColor = 'rgba(255, 87, 34, 0.3)';
+        ctx.shadowBlur = 20;
+    }
+    
+    ctx.fillText('H', 0, 0);
+    
+    ctx.restore();
+}
+
+// Dibujar el suelo/plataforma
+function drawGround() {
+    // Pasto
+    ctx.fillStyle = '#4CAF50';
+    ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+    
+    // Líneas de pasto
+    ctx.strokeStyle = '#388E3C';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < canvas.width; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(i, groundY);
+        ctx.lineTo(i + 10, groundY + 10);
+        ctx.stroke();
+    }
+    
+    // Plataforma de aterrizaje (helipuerto)
+    const platformWidth = 250;
+    const platformHeight = 15;
+    const platformX = helicopterX - platformWidth / 2;
+    const platformY = groundY - 5;
+    
+    // Base de la plataforma
+    ctx.fillStyle = '#757575';
+    ctx.fillRect(platformX, platformY, platformWidth, platformHeight);
+    
+    // Borde de la plataforma
+    ctx.strokeStyle = '#424242';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(platformX, platformY, platformWidth, platformHeight);
+    
+    // Símbolo de helipuerto (H)
+    ctx.fillStyle = '#FFEB3B';
+    ctx.font = 'bold 60px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('H', helicopterX, platformY - 30);
+    
+    // Círculo del helipuerto
+    ctx.strokeStyle = '#FFEB3B';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(helicopterX, platformY - 30, 50, 0, Math.PI * 2);
+    ctx.stroke();
+}
+
+// Dibujar nubes de fondo
+function drawClouds() {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    
+    // Nube 1
+    drawCloud(150, 100, 1);
+    // Nube 2
+    drawCloud(600, 150, 0.8);
+    // Nube 3
+    drawCloud(350, 80, 1.2);
+}
+
+function drawCloud(x, y, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    
+    ctx.beginPath();
+    ctx.arc(0, 0, 25, 0, Math.PI * 2);
+    ctx.arc(25, -5, 30, 0, Math.PI * 2);
+    ctx.arc(50, 0, 25, 0, Math.PI * 2);
+    ctx.arc(25, 10, 25, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// Detectar si el toque está sobre la hélice
+function isOverPropeller(x, y) {
+    const propX = helicopterX;
+    const propY = helicopterY - 80;
+    const distance = Math.sqrt((x - propX) ** 2 + (y - propY) ** 2);
+    return distance < 80;
+}
+
+// Calcular ángulo desde el centro de la hélice
+function getAngleFromPropeller(x, y) {
+    const propX = helicopterX;
+    const propY = helicopterY - 80;
+    return Math.atan2(y - propY, x - propX);
+}
+
+// Manejo de eventos táctiles
+function handleStart(e) {
+    e.preventDefault();
+    if (isTakingOff || celebrating) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    if (isOverPropeller(pos.x, pos.y)) {
+        isSpinning = true;
+        touchPoints = [pos];
+        lastAngle = getAngleFromPropeller(pos.x, pos.y);
+        totalRotation = 0;
+        console.log('🚁 ¡Empezando a girar la hélice!');
+    }
+}
+
+function handleMove(e) {
+    e.preventDefault();
+    if (!isSpinning || isTakingOff || celebrating) return;
+    
+    const pos = getInputPosition(e, canvas);
+    touchPoints.push(pos);
+    
+    // Mantener solo los últimos 10 puntos
+    if (touchPoints.length > 10) {
+        touchPoints.shift();
+    }
+    
+    // Calcular rotación
+    const currentAngle = getAngleFromPropeller(pos.x, pos.y);
+    
+    if (lastAngle !== null) {
+        let angleDiff = currentAngle - lastAngle;
+        
+        // Normalizar la diferencia de ángulo
+        if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+        if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+        
+        totalRotation += Math.abs(angleDiff);
+        propellerSpeed += Math.abs(angleDiff) * 0.5;
+        
+        // Limitar velocidad máxima
+        if (propellerSpeed > 0.8) {
+            propellerSpeed = 0.8;
+        }
+    }
+    
+    lastAngle = currentAngle;
+    
+    // Verificar si ha girado suficiente
+    if (totalRotation >= rotationThreshold && !isTakingOff) {
+        console.log('✅ ¡Suficiente rotación! El helicóptero va a despegar.');
+        isTakingOff = true;
+        
+        try {
+            helicopterSound.currentTime = 0;
+            helicopterSound.volume = 0.7;
+            helicopterSound.play();
+        } catch (err) {
+            console.log('Error reproduciendo sonido del helicóptero:', err);
+        }
+    }
+}
+
+function handleEnd(e) {
+    e.preventDefault();
+    isSpinning = false;
+    touchPoints = [];
+    lastAngle = null;
+}
+
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Actualizar física del juego
+function updateGame() {
+    // Actualizar rotación de la hélice
+    propellerRotation += propellerSpeed;
+    
+    // Fricción - la hélice se desacelera si no se gira
+    if (!isSpinning) {
+        propellerSpeed *= 0.95;
+    }
+    
+    // Calcular vibración basada en velocidad
+    shakeAmount = propellerSpeed * 20;
+    
+    // Despegue
+    if (isTakingOff) {
+        helicopterY -= 3;
+        
+        // Cuando sale de la pantalla
+        if (helicopterY < -150) {
+            celebrating = true;
+            score++;
+            
+            showCelebration('¡El helicóptero despegó! 🚁✨');
+            
+            setTimeout(() => {
+                resetGame();
+            }, 3000);
+        }
+    }
+}
+
+// Reiniciar juego
+function resetGame() {
+    helicopterY = 420; // Volver a la plataforma
+    helicopterX = 400;
+    propellerRotation = 0;
+    propellerSpeed = 0;
+    isSpinning = false;
+    isTakingOff = false;
+    celebrating = false;
+    shakeAmount = 0;
+    totalRotation = 0;
+}
+
+// Mostrar celebración
+function showCelebration(message) {
+    console.log(message);
+}
+
+// Loop del juego
+function gameLoop() {
+    // Fondo (cielo)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#87CEEB');
+    gradient.addColorStop(1, '#E0F6FF');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Nubes
+    drawClouds();
+    
+    // Suelo y plataforma
+    drawGround();
+    
+    // Actualizar física
+    updateGame();
+    
+    // Dibujar helicóptero y hélice
+    drawHelicopter();
+    drawPropeller();
+    
+    // Instrucciones
+    if (score === 0 && !isTakingOff && !celebrating) {
+        ctx.font = 'bold 26px Arial';
+        ctx.fillStyle = '#1565C0';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 6;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡Gira la hélice (H) muy rápido!', canvas.width / 2, 50);
+        ctx.fillText('¡Gira la hélice (H) muy rápido!', canvas.width / 2, 50);
+    }
+    
+    // Indicador de progreso
+    if (isSpinning && !isTakingOff) {
+        const progress = Math.min(totalRotation / rotationThreshold, 1);
+        const barWidth = 300;
+        const barHeight = 30;
+        const barX = (canvas.width - barWidth) / 2;
+        const barY = canvas.height - 80;
+        
+        // Fondo de la barra
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        
+        // Progreso
+        ctx.fillStyle = progress < 1 ? '#FF9800' : '#4CAF50';
+        ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+        
+        // Borde
+        ctx.strokeStyle = '#424242';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
+        
+        // Texto
+        ctx.font = 'bold 18px Arial';
+        ctx.fillStyle = '#424242';
+        ctx.textAlign = 'center';
+        ctx.fillText('Velocidad de la Hélice', canvas.width / 2, barY - 10);
+    }
+    
+    // Puntuación
+    ctx.font = 'bold 30px Arial';
+    ctx.fillStyle = '#1565C0';
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'left';
+    ctx.strokeText(`🚁 Despegues: ${score}`, 20, canvas.height - 20);
+    ctx.fillText(`🚁 Despegues: ${score}`, 20, canvas.height - 20);
+    
+    // Mensaje de celebración
+    if (celebrating) {
+        ctx.font = 'bold 48px Arial';
+        ctx.fillStyle = '#4CAF50';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡DESPEGÓ! 🚁✨', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('¡DESPEGÓ! 🚁✨', canvas.width / 2, canvas.height / 2);
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}
