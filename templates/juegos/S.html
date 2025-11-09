@@ -2,58 +2,69 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Pro - Letras S Grandes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Snake Mágico - Colisión Perfecta</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            font-family: 'Comic Sans MS', cursive;
             overflow: hidden;
+            touch-action: none;
         }
 
         .container {
             position: relative;
             text-align: center;
             background: rgba(255, 255, 255, 0.1);
-            padding: 30px;
+            padding: 15px;
             border-radius: 20px;
             backdrop-filter: blur(12px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            max-width: 95vw;
         }
 
         h1 {
             color: #fff;
-            margin-bottom: 20px;
-            font-size: 2.8em;
-            text-shadow: 0 0 15px rgba(100, 255, 200, 0.7);
+            margin-bottom: 10px;
+            font-size: 1.8em;
+            text-shadow: 0 0 10px rgba(255, 200, 100, 0.7);
         }
 
         #score {
-            font-size: 32px;
-            color: #64ffda;
+            font-size: 28px;
+            color: #ffd93d;
             font-weight: bold;
-            margin-bottom: 25px;
-            text-shadow: 0 0 8px rgba(100, 255, 218, 0.5);
+            margin-bottom: 15px;
+            text-shadow: 0 0 8px rgba(255, 217, 61, 0.5);
         }
 
         canvas {
-            border: 4px solid rgba(255, 255, 255, 0.3);
+            border: 4px solid rgba(255, 255, 255, 0.5);
             border-radius: 15px;
             background: #0a0a0a;
             display: block;
             margin: 0 auto;
-            box-shadow: 0 0 25px rgba(100, 255, 200, 0.4);
+            box-shadow: 0 0 20px rgba(100, 200, 255, 0.4);
+            max-width: 100%;
+            height: auto;
+            cursor: grab;
+        }
+
+        canvas:active {
+            cursor: grabbing;
         }
 
         #gameOver {
@@ -64,64 +75,79 @@
             transform: translate(-50%, -50%);
             background: rgba(0, 0, 0, 0.95);
             color: white;
-            padding: 50px;
+            padding: 35px;
             border-radius: 20px;
             text-align: center;
             box-shadow: 0 0 40px rgba(255, 0, 0, 0.6);
             border: 3px solid #ff4444;
+            z-index: 1000;
         }
 
         #gameOver h2 {
-            color: #ff4444;
-            margin-bottom: 25px;
-            font-size: 2.5em;
+            color: #ffd93d;
+            margin-bottom: 15px;
+            font-size: 2em;
         }
 
         #gameOver p {
-            margin: 15px 0;
-            font-size: 1.4em;
+            margin: 10px 0;
+            font-size: 1.2em;
         }
 
         button {
-            background: linear-gradient(135deg, #64ffda, #00bcd4);
+            background: linear-gradient(135deg, #ffd93d, #ffb347);
             color: #000;
             border: none;
             padding: 15px 30px;
             font-size: 20px;
             border-radius: 8px;
             cursor: pointer;
-            margin: 10px 5px;
+            margin: 5px;
             font-weight: bold;
             transition: all 0.3s ease;
         }
 
         button:hover {
-            transform: scale(1.1);
-            box-shadow: 0 0 20px rgba(100, 255, 218, 0.7);
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 217, 61, 0.7);
         }
 
-        .controls {
-            margin-top: 25px;
+        .controls-info {
             color: rgba(255, 255, 255, 0.8);
-            font-size: 1.2em;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .swipe-hint {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <h1>🐍 Snake Pro - Letras S</h1>
+        <h1>🐍 Snake Mágico</h1>
         <div id="score">Puntuación: 0</div>
-        <canvas id="gameCanvas" width="600" height="450"></canvas>
-        <div class="controls">
-            Usa las flechas ⬅️⬆️➡️⬇️ para mover la serpiente
+        <canvas id="gameCanvas" width="600" height="420"></canvas>
+        <div class="swipe-hint">👉 Desliza para mover</div>
+        <div class="controls-info">
+            ¡Desliza tu dedo para dirigir la serpiente!
         </div>
     </div>
 
     <div id="gameOver">
-        <h2>¡Juego Terminado!</h2>
+        <h2>¡Super Jugador! 🌟</h2>
         <p id="finalScore">Puntuación: 0</p>
-        <button onclick="resetGame()">🔄 Reiniciar</button>
-        <button onclick="window.location.reload()">❌ Salir</button>
+        <p>¿Quieres jugar otra vez?</p>
+        <button onclick="resetGame()">🔄 ¡Sí, reiniciar!</button>
     </div>
 
     <script>
@@ -131,14 +157,15 @@
         const gameOverElement = document.getElementById('gameOver');
         const finalScoreElement = document.getElementById('finalScore');
 
-        // Configuración MÁS GRANDE
-        const CELL_SIZE = 30; // Aumentado de 18 a 30
+        // Configuración - MOVIMIENTO CONTINUO
+        const CELL_SIZE = 30;
         const GRID_WIDTH = canvas.width / CELL_SIZE;
         const GRID_HEIGHT = canvas.height / CELL_SIZE;
-        const INITIAL_SPEED = 130;
+        const INITIAL_SPEED = 3;
         let speed = INITIAL_SPEED;
+        const COLLISION_DISTANCE = CELL_SIZE * 0.8; // ÁREA DE COLISIÓN AMPLIFICADA
 
-        // Estado del juego
+        // Estado del juego - POSICIÓN CONTINUA
         let snake = [];
         let direction = { x: 1, y: 0 };
         let food = { x: 0, y: 0, letter: 'S' };
@@ -146,14 +173,19 @@
         let gameRunning = true;
         let lastUpdate = 0;
 
+        // Variables para deslizamiento táctil
+        let touchStartX = null;
+        let touchStartY = null;
+        let touchThreshold = 20;
+
         // Inicializar juego
         function init() {
             snake = [
-                { x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) },
-                { x: Math.floor(GRID_WIDTH / 2) - 1, y: Math.floor(GRID_HEIGHT / 2) },
-                { x: Math.floor(GRID_WIDTH / 2) - 2, y: Math.floor(GRID_HEIGHT / 2) }
+                { x: Math.floor(GRID_WIDTH / 2) * CELL_SIZE, y: Math.floor(GRID_HEIGHT / 2) * CELL_SIZE },
+                { x: (Math.floor(GRID_WIDTH / 2) - 1) * CELL_SIZE, y: Math.floor(GRID_HEIGHT / 2) * CELL_SIZE },
+                { x: (Math.floor(GRID_WIDTH / 2) - 2) * CELL_SIZE, y: Math.floor(GRID_HEIGHT / 2) * CELL_SIZE }
             ];
-            direction = { x: 1, y: 0 };
+            direction = { x: speed, y: 0 };
             score = 0;
             scoreElement.textContent = `Puntuación: ${score}`;
             gameRunning = true;
@@ -162,107 +194,152 @@
             gameLoop();
         }
 
-        // Colocar letra S aleatoria (mayúscula o minúscula)
+        // Colocar letra S aleatoria
         function placeFood() {
             let letter = Math.random() < 0.5 ? 'S' : 's';
             food = {
-                x: Math.floor(Math.random() * GRID_WIDTH),
-                y: Math.floor(Math.random() * GRID_HEIGHT),
+                x: Math.floor(Math.random() * GRID_WIDTH) * CELL_SIZE,
+                y: Math.floor(Math.random() * GRID_HEIGHT) * CELL_SIZE,
                 letter: letter
             };
 
-            if (snake.some(segment => segment.x === food.x && segment.y === food.y)) {
+            // Verificar que no aparezca en la serpiente
+            if (snake.some(segment => 
+                getDistance(segment, food) < CELL_SIZE)) {
                 placeFood();
             }
         }
 
-        // Mover serpiente
+        // Calcular distancia entre dos puntos
+        function getDistance(pos1, pos2) {
+            const centerX1 = pos1.x + CELL_SIZE / 2;
+            const centerY1 = pos1.y + CELL_SIZE / 2;
+            const centerX2 = pos2.x + CELL_SIZE / 2;
+            const centerY2 = pos2.y + CELL_SIZE / 2;
+            
+            return Math.sqrt(Math.pow(centerX1 - centerX2, 2) + Math.pow(centerY1 - centerY2, 2));
+        }
+
+        // Mover serpiente - MOVIMIENTO CONTINUO Y FLUIDO
         function moveSnake() {
-            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+            let headX = snake[0].x + direction.x;
+            let headY = snake[0].y + direction.y;
 
-            // Verificar colisiones
-            if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT ||
-                snake.some(segment => segment.x === head.x && segment.y === head.y)) {
-                gameOver();
-                return;
-            }
+            // TELETRANSPORTE EN PAREDES
+            if (headX < 0) headX = canvas.width - CELL_SIZE;
+            if (headX >= canvas.width) headX = 0;
+            if (headY < 0) headY = canvas.height - CELL_SIZE;
+            if (headY >= canvas.height) headY = 0;
 
+            const head = { x: headX, y: headY };
             snake.unshift(head);
 
-            // Verificar si comió
-            if (head.x === food.x && head.y === food.y) {
+            // **COLISIÓN POR DISTANCIA - NO POR GRID**
+            // Se come la letra si está cerca suficiente (independientemente del tamaño)
+            if (getDistance(head, food) < COLLISION_DISTANCE) {
                 score++;
                 scoreElement.textContent = `Puntuación: ${score}`;
                 placeFood();
-                if (speed > 40) speed -= 2;
+                if (speed < 8) speed += 0.2;
             } else {
                 snake.pop();
             }
         }
 
-        // Dibujar con elementos MÁS GRANDES
+        // Dibujar CABEZA Y CUERPO REALISTAS
         function draw() {
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Dibujar serpiente
             snake.forEach((segment, index) => {
-                const x = segment.x * CELL_SIZE;
-                const y = segment.y * CELL_SIZE;
-                
-                // Sombra
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                ctx.fillRect(x + 2, y + 2, CELL_SIZE, CELL_SIZE);
+                const x = segment.x;
+                const y = segment.y;
+                const centerX = x + CELL_SIZE / 2;
+                const centerY = y + CELL_SIZE / 2;
+                const radius = CELL_SIZE / 2 - 1;
 
-                // Cuerpo principal con gradiente
-                const gradient = ctx.createRadialGradient(
-                    x + CELL_SIZE/2, y + CELL_SIZE/2, 1,
-                    x + CELL_SIZE/2, y + CELL_SIZE/2, CELL_SIZE/2
-                );
-                
                 if (index === 0) {
-                    // Cabeza con gradiente más brillante
-                    gradient.addColorStop(0, '#a5d6a7');
-                    gradient.addColorStop(1, '#2e7d32');
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(x, y, CELL_SIZE - 2, CELL_SIZE - 2);
+                    // ===== DIBUJAR CABEZA DE SERPIENTE =====
                     
-                    // Ojos MÁS GRANDES y proporcionales
+                    // Sombra de la cabeza
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(centerX + 2, centerY + 2, radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Cabeza principal (círculo)
+                    const headGradient = ctx.createRadialGradient(
+                        centerX - 3, centerY - 3, 1,
+                        centerX, centerY, radius
+                    );
+                    headGradient.addColorStop(0, '#a5d6a7');
+                    headGradient.addColorStop(1, '#2e7d32');
+                    ctx.fillStyle = headGradient;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Ojos en la cabeza
                     ctx.fillStyle = '#fff';
-                    ctx.fillRect(x + 7, y + 7, 6, 6); // Ojo izquierdo
-                    ctx.fillRect(x + 17, y + 7, 6, 6); // Ojo derecho
+                    ctx.beginPath();
+                    ctx.arc(centerX - 6, centerY - 3, 3, 0, Math.PI * 2);
+                    ctx.arc(centerX + 6, centerY - 3, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Pupilas
                     ctx.fillStyle = '#000';
-                    ctx.fillRect(x + 9, y + 9, 3, 3); // Pupila izquierda
-                    ctx.fillRect(x + 19, y + 9, 3, 3); // Pupila derecha
+                    ctx.beginPath();
+                    ctx.arc(centerX - 6, centerY - 3, 1.5, 0, Math.PI * 2);
+                    ctx.arc(centerX + 6, centerY - 3, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Lengua animada
+                    if (score % 2 === 0) {
+                        ctx.fillStyle = '#ff6b6b';
+                        ctx.fillRect(centerX - 2, centerY + 8, 4, 6);
+                    }
+
                 } else {
-                    // Cuerpo con gradiente normal
-                    gradient.addColorStop(0, '#81c784');
-                    gradient.addColorStop(1, '#388e3c');
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(x, y, CELL_SIZE - 2, CELL_SIZE - 2);
+                    // ===== DIBUJAR CUERPO DE SERPIENTE =====
+                    
+                    // Sombra del cuerpo
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(centerX + 2, centerY + 2, radius * 0.9, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Cuerpo principal
+                    const bodyGradient = ctx.createRadialGradient(
+                        centerX - 2, centerY - 2, 1,
+                        centerX, centerY, radius * 0.9
+                    );
+                    bodyGradient.addColorStop(0, '#81c784');
+                    bodyGradient.addColorStop(1, '#388e3c');
+                    ctx.fillStyle = bodyGradient;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius * 0.9, 0, Math.PI * 2);
+                    ctx.fill();
                 }
             });
 
-            // Dibujar LETRA S MÁS GRANDE
-            const fx = food.x * CELL_SIZE + CELL_SIZE / 2;
-            const fy = food.y * CELL_SIZE + CELL_SIZE / 2;
+            // Dibujar LETRA S
+            const fx = food.x + CELL_SIZE / 2;
+            const fy = food.y + CELL_SIZE / 2;
             
-            // Sombra de la letra
+            // Sombra
             ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.font = `bold ${CELL_SIZE + 8}px Arial`; // Fuente más grande
+            ctx.font = `bold ${CELL_SIZE + 14}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(food.letter, fx + 1, fy + 1);
+            ctx.fillText(food.letter, fx + 2, fy + 2);
 
-            // Letra principal con gradiente
-            const letterGradient = ctx.createRadialGradient(fx - 5, fy - 5, 1, fx, fy, CELL_SIZE / 2);
+            // Letra principal
+            const letterGradient = ctx.createRadialGradient(fx - 6, fy - 6, 1, fx, fy, CELL_SIZE / 2);
             
             if (food.letter === 'S') {
-                // Mayúscula S en gradiente dorado/brillante
                 letterGradient.addColorStop(0, '#fff59d');
                 letterGradient.addColorStop(1, '#ffd700');
             } else {
-                // Minúscula s en gradiente plateado/brillante
                 letterGradient.addColorStop(0, '#e0e0e0');
                 letterGradient.addColorStop(1, '#b0bec5');
             }
@@ -284,38 +361,115 @@
             init();
         }
 
-        // Bucle principal del juego
+        // Bucle principal
         function gameLoop(timestamp) {
             if (!gameRunning) return;
 
-            if (timestamp - lastUpdate > speed) {
-                moveSnake();
-                draw();
-                lastUpdate = timestamp;
-            }
-
+            moveSnake();
+            draw();
+            
             requestAnimationFrame(gameLoop);
         }
 
-        // Controles
-        document.addEventListener('keydown', (e) => {
+        // ===== SISTEMA DE DESLIZAMIENTO TÁCTIL =====
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+        let mouseDown = false;
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mouseleave', handleMouseUp);
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+        }
+
+        function handleMouseDown(e) {
+            e.preventDefault();
+            mouseDown = true;
+            touchStartX = e.clientX;
+            touchStartY = e.clientY;
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+        }
+
+        function handleMouseMove(e) {
+            if (!mouseDown) return;
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            if (touchStartX === null || touchStartY === null) return;
+            
+            const touch = e.changedTouches[0];
+            const deltaX = touch.clientX - touchStartX;
+            const deltaY = touch.clientY - touchStartY;
+            
+            processSwipe(deltaX, deltaY);
+            
+            touchStartX = null;
+            touchStartY = null;
+        }
+
+        function handleMouseUp(e) {
+            if (!mouseDown) return;
+            mouseDown = false;
+            
+            const deltaX = e.clientX - touchStartX;
+            const deltaY = e.clientY - touchStartY;
+            
+            processSwipe(deltaX, deltaY);
+            
+            touchStartX = null;
+            touchStartY = null;
+        }
+
+        function processSwipe(deltaX, deltaY) {
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (Math.abs(deltaX) > touchThreshold) {
+                    if (deltaX > 0) {
+                        changeDirection('right');
+                    } else {
+                        changeDirection('left');
+                    }
+                }
+            } else {
+                if (Math.abs(deltaY) > touchThreshold) {
+                    if (deltaY > 0) {
+                        changeDirection('down');
+                    } else {
+                        changeDirection('up');
+                    }
+                }
+            }
+        }
+
+        // Cambiar dirección
+        function changeDirection(newDirection) {
             if (!gameRunning) return;
 
-            switch (e.key) {
-                case 'ArrowUp':
-                    if (direction.y === 0) direction = { x: 0, y: -1 };
+            switch (newDirection) {
+                case 'up':
+                    if (direction.y === 0) direction = { x: 0, y: -speed };
                     break;
-                case 'ArrowDown':
-                    if (direction.y === 0) direction = { x: 0, y: 1 };
+                case 'down':
+                    if (direction.y === 0) direction = { x: 0, y: speed };
                     break;
-                case 'ArrowLeft':
-                    if (direction.x === 0) direction = { x: -1, y: 0 };
+                case 'left':
+                    if (direction.x === 0) direction = { x: -speed, y: 0 };
                     break;
-                case 'ArrowRight':
-                    if (direction.x === 0) direction = { x: 1, y: 0 };
+                case 'right':
+                    if (direction.x === 0) direction = { x: speed, y: 0 };
                     break;
             }
-        });
+        }
 
         // Iniciar
         init();
