@@ -1,19 +1,324 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Pro - Letras S Grandes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-{% block title %}Letra S - Sonidos{% endblock %}
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
 
-{% block content %}
-<div class="game-header">
-    <h1 class="game-title">🐍 Letra S - Sonidos</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
-    <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
-</div>
+        .container {
+            position: relative;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
 
-<div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
+        h1 {
+            color: #fff;
+            margin-bottom: 20px;
+            font-size: 2.8em;
+            text-shadow: 0 0 15px rgba(100, 255, 200, 0.7);
+        }
+
+        #score {
+            font-size: 32px;
+            color: #64ffda;
+            font-weight: bold;
+            margin-bottom: 25px;
+            text-shadow: 0 0 8px rgba(100, 255, 218, 0.5);
+        }
+
+        canvas {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            background: #0a0a0a;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 25px rgba(100, 255, 200, 0.4);
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.6);
+            border: 3px solid #ff4444;
+        }
+
+        #gameOver h2 {
+            color: #ff4444;
+            margin-bottom: 25px;
+            font-size: 2.5em;
+        }
+
+        #gameOver p {
+            margin: 15px 0;
+            font-size: 1.4em;
+        }
+
+        button {
+            background: linear-gradient(135deg, #64ffda, #00bcd4);
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(100, 255, 218, 0.7);
+        }
+
+        .controls {
+            margin-top: 25px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐍 Snake Pro - Letras S</h1>
+        <div id="score">Puntuación: 0</div>
+        <canvas id="gameCanvas" width="600" height="450"></canvas>
+        <div class="controls">
+            Usa las flechas ⬅️⬆️➡️⬇️ para mover la serpiente
+        </div>
     </div>
-</div>
-{% endblock %}
+
+    <div id="gameOver">
+        <h2>¡Juego Terminado!</h2>
+        <p id="finalScore">Puntuación: 0</p>
+        <button onclick="resetGame()">🔄 Reiniciar</button>
+        <button onclick="window.location.reload()">❌ Salir</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+
+        // Configuración MÁS GRANDE
+        const CELL_SIZE = 30; // Aumentado de 18 a 30
+        const GRID_WIDTH = canvas.width / CELL_SIZE;
+        const GRID_HEIGHT = canvas.height / CELL_SIZE;
+        const INITIAL_SPEED = 130;
+        let speed = INITIAL_SPEED;
+
+        // Estado del juego
+        let snake = [];
+        let direction = { x: 1, y: 0 };
+        let food = { x: 0, y: 0, letter: 'S' };
+        let score = 0;
+        let gameRunning = true;
+        let lastUpdate = 0;
+
+        // Inicializar juego
+        function init() {
+            snake = [
+                { x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) },
+                { x: Math.floor(GRID_WIDTH / 2) - 1, y: Math.floor(GRID_HEIGHT / 2) },
+                { x: Math.floor(GRID_WIDTH / 2) - 2, y: Math.floor(GRID_HEIGHT / 2) }
+            ];
+            direction = { x: 1, y: 0 };
+            score = 0;
+            scoreElement.textContent = `Puntuación: ${score}`;
+            gameRunning = true;
+            speed = INITIAL_SPEED;
+            placeFood();
+            gameLoop();
+        }
+
+        // Colocar letra S aleatoria (mayúscula o minúscula)
+        function placeFood() {
+            let letter = Math.random() < 0.5 ? 'S' : 's';
+            food = {
+                x: Math.floor(Math.random() * GRID_WIDTH),
+                y: Math.floor(Math.random() * GRID_HEIGHT),
+                letter: letter
+            };
+
+            if (snake.some(segment => segment.x === food.x && segment.y === food.y)) {
+                placeFood();
+            }
+        }
+
+        // Mover serpiente
+        function moveSnake() {
+            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+            // Verificar colisiones
+            if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT ||
+                snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+
+            snake.unshift(head);
+
+            // Verificar si comió
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                scoreElement.textContent = `Puntuación: ${score}`;
+                placeFood();
+                if (speed > 40) speed -= 2;
+            } else {
+                snake.pop();
+            }
+        }
+
+        // Dibujar con elementos MÁS GRANDES
+        function draw() {
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar serpiente
+            snake.forEach((segment, index) => {
+                const x = segment.x * CELL_SIZE;
+                const y = segment.y * CELL_SIZE;
+                
+                // Sombra
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(x + 2, y + 2, CELL_SIZE, CELL_SIZE);
+
+                // Cuerpo principal con gradiente
+                const gradient = ctx.createRadialGradient(
+                    x + CELL_SIZE/2, y + CELL_SIZE/2, 1,
+                    x + CELL_SIZE/2, y + CELL_SIZE/2, CELL_SIZE/2
+                );
+                
+                if (index === 0) {
+                    // Cabeza con gradiente más brillante
+                    gradient.addColorStop(0, '#a5d6a7');
+                    gradient.addColorStop(1, '#2e7d32');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x, y, CELL_SIZE - 2, CELL_SIZE - 2);
+                    
+                    // Ojos MÁS GRANDES y proporcionales
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(x + 7, y + 7, 6, 6); // Ojo izquierdo
+                    ctx.fillRect(x + 17, y + 7, 6, 6); // Ojo derecho
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(x + 9, y + 9, 3, 3); // Pupila izquierda
+                    ctx.fillRect(x + 19, y + 9, 3, 3); // Pupila derecha
+                } else {
+                    // Cuerpo con gradiente normal
+                    gradient.addColorStop(0, '#81c784');
+                    gradient.addColorStop(1, '#388e3c');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x, y, CELL_SIZE - 2, CELL_SIZE - 2);
+                }
+            });
+
+            // Dibujar LETRA S MÁS GRANDE
+            const fx = food.x * CELL_SIZE + CELL_SIZE / 2;
+            const fy = food.y * CELL_SIZE + CELL_SIZE / 2;
+            
+            // Sombra de la letra
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.font = `bold ${CELL_SIZE + 8}px Arial`; // Fuente más grande
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(food.letter, fx + 1, fy + 1);
+
+            // Letra principal con gradiente
+            const letterGradient = ctx.createRadialGradient(fx - 5, fy - 5, 1, fx, fy, CELL_SIZE / 2);
+            
+            if (food.letter === 'S') {
+                // Mayúscula S en gradiente dorado/brillante
+                letterGradient.addColorStop(0, '#fff59d');
+                letterGradient.addColorStop(1, '#ffd700');
+            } else {
+                // Minúscula s en gradiente plateado/brillante
+                letterGradient.addColorStop(0, '#e0e0e0');
+                letterGradient.addColorStop(1, '#b0bec5');
+            }
+            
+            ctx.fillStyle = letterGradient;
+            ctx.fillText(food.letter, fx, fy);
+        }
+
+        // Game Over
+        function gameOver() {
+            gameRunning = false;
+            finalScoreElement.textContent = `Puntuación: ${score}`;
+            gameOverElement.style.display = 'block';
+        }
+
+        // Reiniciar juego
+        function resetGame() {
+            gameOverElement.style.display = 'none';
+            init();
+        }
+
+        // Bucle principal del juego
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+
+            if (timestamp - lastUpdate > speed) {
+                moveSnake();
+                draw();
+                lastUpdate = timestamp;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Controles
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    if (direction.y === 0) direction = { x: 0, y: -1 };
+                    break;
+                case 'ArrowDown':
+                    if (direction.y === 0) direction = { x: 0, y: 1 };
+                    break;
+                case 'ArrowLeft':
+                    if (direction.x === 0) direction = { x: -1, y: 0 };
+                    break;
+                case 'ArrowRight':
+                    if (direction.x === 0) direction = { x: 1, y: 0 };
+                    break;
+            }
+        });
+
+        // Iniciar
+        init();
+    </script>
+</body>
+</html>
