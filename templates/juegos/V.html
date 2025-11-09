@@ -1,19 +1,398 @@
 {% extends "base.html" %}
 
-{% block title %}Letra V - Volar Mariposas{% endblock %}
+{% block title %}Letra V - Arma la Vaca{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🦋 Letra V - Volar Mariposas</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🐄 Letra V - Arma la Vaca</h1>
+    <p class="game-description">¡Arrastra las piezas para armar la vaca!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+const puzzleImage = new Image();
+puzzleImage.src = "/assets/img/vaca.jpg";
+
+const cowSound = new Audio("/assets/audio/vaca_sonido.mp3");
+
+let imageLoaded = false;
+let pieces = [];
+let draggedPiece = null;
+let offsetX = 0;
+let offsetY = 0;
+let completed = false;
+let celebrationTimer = 0;
+
+// Configuración del rompecabezas
+const puzzleX = 200;
+const puzzleY = 150;
+const puzzleWidth = 400;
+const puzzleHeight = 300;
+const cols = 3;
+const rows = 2;
+const pieceWidth = puzzleWidth / cols;
+const pieceHeight = puzzleHeight / rows;
+
+// Cargar imagen
+puzzleImage.onload = function() {
+    imageLoaded = true;
+    initPuzzle();
+};
+
+puzzleImage.onerror = function() {
+    console.error('Error al cargar la imagen de la vaca');
+    imageLoaded = false;
+};
+
+// Inicializar rompecabezas
+function initPuzzle() {
+    pieces = [];
+    
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const piece = {
+                id: row * cols + col,
+                col: col,
+                row: row,
+                // Posición correcta en el puzzle
+                correctX: puzzleX + col * pieceWidth,
+                correctY: puzzleY + row * pieceHeight,
+                // Posición actual (desordenada)
+                x: 0,
+                y: 0,
+                // Posición en la imagen original
+                srcX: col * (puzzleImage.width / cols),
+                srcY: row * (puzzleImage.height / rows),
+                srcWidth: puzzleImage.width / cols,
+                srcHeight: puzzleImage.height / rows,
+                // Estado
+                placed: false,
+                dragging: false
+            };
+            pieces.push(piece);
+        }
+    }
+    
+    // Mezclar piezas en la parte inferior
+    shufflePieces();
+}
+
+// Mezclar piezas
+function shufflePieces() {
+    const startY = 420;
+    const spacing = 10;
+    const piecesPerRow = 3;
+    
+    // Mezclar orden
+    for (let i = pieces.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+    }
+    
+    // Posicionar piezas mezcladas
+    pieces.forEach((piece, index) => {
+        const row = Math.floor(index / piecesPerRow);
+        const col = index % piecesPerRow;
+        piece.x = 150 + col * (pieceWidth + spacing);
+        piece.y = startY + row * (pieceHeight + spacing);
+    });
+}
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Verificar si un punto está dentro de una pieza
+function isInsidePiece(x, y, piece) {
+    return x >= piece.x && x <= piece.x + pieceWidth &&
+           y >= piece.y && y <= piece.y + pieceHeight;
+}
+
+// Verificar si la pieza está cerca de su posición correcta
+function isNearCorrectPosition(piece) {
+    const distance = Math.sqrt(
+        Math.pow(piece.x - piece.correctX, 2) + 
+        Math.pow(piece.y - piece.correctY, 2)
+    );
+    return distance < 30;
+}
+
+// Verificar si el puzzle está completo
+function checkCompletion() {
+    return pieces.every(piece => piece.placed);
+}
+
+// Dibujar pieza del rompecabezas
+function drawPiece(piece) {
+    if (piece.placed && !completed) {
+        // Pieza en su lugar correcto
+        ctx.drawImage(
+            puzzleImage,
+            piece.srcX, piece.srcY, piece.srcWidth, piece.srcHeight,
+            piece.correctX, piece.correctY, pieceWidth, pieceHeight
+        );
+        
+        // Borde verde para indicar que está colocada
+        ctx.strokeStyle = '#4CAF50';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(piece.correctX, piece.correctY, pieceWidth, pieceHeight);
+    } else if (!piece.placed) {
+        // Pieza movible
+        ctx.save();
+        
+        // Sombra
+        if (piece.dragging) {
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 5;
+        }
+        
+        ctx.drawImage(
+            puzzleImage,
+            piece.srcX, piece.srcY, piece.srcWidth, piece.srcHeight,
+            piece.x, piece.y, pieceWidth, pieceHeight
+        );
+        
+        // Borde
+        ctx.strokeStyle = piece.dragging ? '#FFD700' : '#FFFFFF';
+        ctx.lineWidth = piece.dragging ? 4 : 2;
+        ctx.strokeRect(piece.x, piece.y, pieceWidth, pieceHeight);
+        
+        ctx.restore();
+    }
+}
+
+// Dibujar áreas de destino
+function drawTargetAreas() {
+    pieces.forEach(piece => {
+        if (!piece.placed) {
+            // Dibujar contorno de la posición correcta
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(piece.correctX, piece.correctY, pieceWidth, pieceHeight);
+            ctx.setLineDash([]);
+        }
+    });
+}
+
+// Manejar inicio de arrastre
+function handleStart(e) {
+    e.preventDefault();
+    if (completed) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    // Buscar pieza tocada (de atrás hacia adelante para priorizar las de arriba)
+    for (let i = pieces.length - 1; i >= 0; i--) {
+        const piece = pieces[i];
+        if (!piece.placed && isInsidePiece(pos.x, pos.y, piece)) {
+            draggedPiece = piece;
+            piece.dragging = true;
+            offsetX = pos.x - piece.x;
+            offsetY = pos.y - piece.y;
+            
+            // Mover pieza al final del array para dibujarla encima
+            pieces.splice(i, 1);
+            pieces.push(piece);
+            break;
+        }
+    }
+}
+
+// Manejar movimiento
+function handleMove(e) {
+    e.preventDefault();
+    if (!draggedPiece) return;
+    
+    const pos = getInputPosition(e, canvas);
+    draggedPiece.x = pos.x - offsetX;
+    draggedPiece.y = pos.y - offsetY;
+}
+
+// Manejar fin de arrastre
+function handleEnd(e) {
+    e.preventDefault();
+    if (!draggedPiece) return;
+    
+    const piece = draggedPiece;
+    piece.dragging = false;
+    
+    // Verificar si está cerca de su posición correcta
+    if (isNearCorrectPosition(piece)) {
+        piece.x = piece.correctX;
+        piece.y = piece.correctY;
+        piece.placed = true;
+        
+        // Verificar si el puzzle está completo
+        if (checkCompletion()) {
+            completed = true;
+            celebrationTimer = 0;
+            // Reproducir sonido de vaca
+            setTimeout(() => {
+                cowSound.play();
+            }, 500);
+        }
+    }
+    
+    draggedPiece = null;
+}
+
+// Event listeners
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#667eea');
+    gradient.addColorStop(1, '#764ba2');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    if (!imageLoaded) {
+        // Mensaje de carga
+        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.fillText('Cargando...', canvas.width / 2, canvas.height / 2);
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    
+    // Título
+    ctx.font = 'bold 32px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'center';
+    ctx.strokeText('🐄 Arma la Vaca', canvas.width / 2, 40);
+    ctx.fillText('🐄 Arma la Vaca', canvas.width / 2, 40);
+    
+    // Instrucciones
+    if (!completed) {
+        ctx.font = 'bold 18px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.strokeText('Arrastra las piezas a su lugar correcto', canvas.width / 2, 75);
+        ctx.fillText('Arrastra las piezas a su lugar correcto', canvas.width / 2, 75);
+    }
+    
+    // Dibujar áreas de destino
+    if (!completed) {
+        drawTargetAreas();
+    }
+    
+    // Dibujar imagen completa si está terminado
+    if (completed) {
+        ctx.drawImage(puzzleImage, puzzleX, puzzleY, puzzleWidth, puzzleHeight);
+    } else {
+        // Dibujar piezas
+        pieces.forEach(piece => drawPiece(piece));
+    }
+    
+    // Celebración
+    if (completed) {
+        celebrationTimer++;
+        
+        if (celebrationTimer > 60) {
+            // Fondo oscuro
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Mensaje
+            ctx.font = 'bold 70px Arial';
+            ctx.fillStyle = '#FFD700';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 8;
+            ctx.textAlign = 'center';
+            ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
+            ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
+            
+            ctx.font = 'bold 28px Arial';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 4;
+            ctx.strokeText('¡Armaste la vaca!', canvas.width / 2, canvas.height / 2 + 20);
+            ctx.fillText('¡Armaste la vaca!', canvas.width / 2, canvas.height / 2 + 20);
+            
+            // Estrellas
+            for (let i = 0; i < 15; i++) {
+                const angle = (celebrationTimer * 0.05 + i * 0.4) % (Math.PI * 2);
+                const radius = 150 + Math.sin(celebrationTimer * 0.1 + i) * 30;
+                const x = canvas.width / 2 + Math.cos(angle) * radius;
+                const y = canvas.height / 2 + Math.sin(angle) * radius;
+                const size = 4 + Math.sin(celebrationTimer * 0.2 + i) * 3;
+                
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Reiniciar después de 10 segundos
+        if (celebrationTimer > 600) {
+            completed = false;
+            celebrationTimer = 0;
+            initPuzzle();
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// Iniciar cuando la imagen esté cargada
+if (puzzleImage.complete) {
+    imageLoaded = true;
+    initPuzzle();
+}
+
+gameLoop();
+</script>
 {% endblock %}
