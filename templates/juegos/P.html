@@ -84,7 +84,9 @@ function initializeCards() {
             width: cardWidth,
             height: cardHeight,
             flipped: false,
-            matched: false
+            matched: false,
+            flipProgress: 0, // 0 = dorso, 1 = frente
+            targetFlip: 0
         });
     }
 }
@@ -112,57 +114,95 @@ function getInputPosition(e, canvas) {
 
 // Dibujar carta
 function drawCard(card) {
+    // Animar el volteo
+    const targetFlip = (card.flipped || card.matched) ? 1 : 0;
+    if (card.flipProgress < targetFlip) {
+        card.flipProgress = Math.min(1, card.flipProgress + 0.15);
+    } else if (card.flipProgress > targetFlip) {
+        card.flipProgress = Math.max(0, card.flipProgress - 0.15);
+    }
+    
+    // Calcular escala horizontal para efecto 3D
+    const scale = Math.abs(Math.cos(card.flipProgress * Math.PI));
+    const cardWidth = card.width * scale;
+    const offsetX = (card.width - cardWidth) / 2;
+    
     // Sombra
     ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.fillRect(card.x + 5, card.y + 5, card.width, card.height);
     
-    if (card.flipped || card.matched) {
-        // Mostrar imagen
+    // Determinar qué lado mostrar
+    const showFront = card.flipProgress > 0.5;
+    
+    if (showFront) {
+        // Mostrar imagen (frente)
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(card.x, card.y, card.width, card.height);
+        ctx.fillRect(card.x + offsetX, card.y, cardWidth, card.height);
         
         // Borde
         ctx.strokeStyle = card.matched ? '#4CAF50' : '#667eea';
         ctx.lineWidth = 4;
-        ctx.strokeRect(card.x, card.y, card.width, card.height);
+        ctx.strokeRect(card.x + offsetX, card.y, cardWidth, card.height);
         
         // Dibujar imagen si está cargada
-        if (card.img.complete) {
-            ctx.drawImage(card.img, card.x + 10, card.y + 10, card.width - 20, card.height - 20);
+        if (card.img.complete && cardWidth > 10) {
+            ctx.drawImage(card.img, 
+                card.x + offsetX + 10, 
+                card.y + 10, 
+                cardWidth - 20, 
+                card.height - 20);
         }
         
-        // Brillo si está emparejada
+        // Borde verde brillante si está emparejada
         if (card.matched) {
+            // Borde verde exterior
+            ctx.strokeStyle = '#4CAF50';
+            ctx.lineWidth = 8;
+            ctx.strokeRect(card.x + offsetX - 4, card.y - 4, cardWidth + 8, card.height + 8);
+            
+            // Brillo dorado
             ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 6;
-            ctx.strokeRect(card.x - 3, card.y - 3, card.width + 6, card.height + 6);
+            ctx.lineWidth = 4;
+            ctx.strokeRect(card.x + offsetX - 2, card.y - 2, cardWidth + 4, card.height + 4);
         }
     } else {
         // Carta volteada (dorso)
-        const gradient = ctx.createLinearGradient(card.x, card.y, card.x + card.width, card.y + card.height);
+        const gradient = ctx.createLinearGradient(
+            card.x + offsetX, card.y, 
+            card.x + offsetX + cardWidth, card.y + card.height
+        );
         gradient.addColorStop(0, '#667eea');
         gradient.addColorStop(1, '#764ba2');
         ctx.fillStyle = gradient;
-        ctx.fillRect(card.x, card.y, card.width, card.height);
+        ctx.fillRect(card.x + offsetX, card.y, cardWidth, card.height);
         
         // Borde
         ctx.strokeStyle = '#FFFFFF';
         ctx.lineWidth = 4;
-        ctx.strokeRect(card.x, card.y, card.width, card.height);
+        ctx.strokeRect(card.x + offsetX, card.y, cardWidth, card.height);
         
-        // Letra P en el dorso
-        ctx.font = 'bold 80px Arial';
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('P', card.x + card.width / 2, card.y + card.height / 2);
-        
-        // Patrón decorativo
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 3; i++) {
-            ctx.strokeRect(card.x + 10 + i * 5, card.y + 10 + i * 5, 
-                          card.width - 20 - i * 10, card.height - 20 - i * 10);
+        // Letra P en el dorso (solo si la carta es visible)
+        if (cardWidth > 20) {
+            ctx.font = `bold ${80 * scale}px Arial`;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('P', card.x + offsetX + cardWidth / 2, card.y + card.height / 2);
+            
+            // Patrón decorativo
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 3; i++) {
+                const padding = 10 + i * 5;
+                if (cardWidth > padding * 2) {
+                    ctx.strokeRect(
+                        card.x + offsetX + padding, 
+                        card.y + padding, 
+                        cardWidth - padding * 2, 
+                        card.height - padding * 2
+                    );
+                }
+            }
         }
     }
 }
