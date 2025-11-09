@@ -33,7 +33,7 @@ JUEGOS = {
     'Q': {'nombre': 'Queso para Ratón', 'descripcion': 'Arrastra el queso al ratón'},
     'R': {'nombre': 'Rompecabezas', 'descripcion': 'Arrastra las piezas para formar la letra R'},
     'S': {'nombre': 'La Serpiente Comilona', 'descripcion': 'Arrastra la serpiente para comer todas las hojas'},
-    'T': {'nombre': 'Tambor', 'descripcion': 'Toca el tambor y haz ritmos'},
+    'T': {'nombre': 'El Caparazón de la Tortuga', 'descripcion': 'Arrastra el caparazón con la letra T'},
     'U': {'nombre': 'Uvas para Contar', 'descripcion': 'Cuenta las uvas'},
     'V': {'nombre': 'Volar Mariposas', 'descripcion': 'Haz volar mariposas'},
     'W': {'nombre': 'Waffles', 'descripcion': 'Decora waffles deliciosos'},

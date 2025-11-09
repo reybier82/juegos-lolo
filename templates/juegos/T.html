@@ -1,19 +1,472 @@
 {% extends "base.html" %}
 
-{% block title %}Letra T - Tambor{% endblock %}
+{% block title %}Letra T - El Caparazón de la Tortuga{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🥁 Letra T - Tambor</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🐢 Letra T - El Caparazón de la Tortuga</h1>
+    <p class="game-description">¡Arrastra el caparazón con la letra T para ayudar a la tortuga!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let shells = [
+    { letter: 'T', x: 100, y: 400, correct: true, dragging: false },
+    { letter: 'I', x: 300, y: 400, correct: false, dragging: false },
+    { letter: 'J', x: 500, y: 400, correct: false, dragging: false }
+];
+
+let draggedShell = null;
+let offsetX = 0;
+let offsetY = 0;
+let completed = false;
+let celebrationTimer = 0;
+
+const turtleX = 400;
+const turtleY = 200;
+const turtleSize = 150;
+
+// Mezclar caparazones
+function shuffleShells() {
+    const positions = [
+        { x: 100, y: 400 },
+        { x: 300, y: 400 },
+        { x: 500, y: 400 }
+    ];
+    
+    for (let i = positions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    
+    shells.forEach((shell, index) => {
+        shell.x = positions[index].x;
+        shell.y = positions[index].y;
+    });
+}
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar tortuga sin caparazón (triste)
+function drawSadTurtle() {
+    // Cuerpo (verde)
+    ctx.fillStyle = '#7CB342';
+    
+    // Cabeza
+    ctx.beginPath();
+    ctx.arc(turtleX - 60, turtleY, 30, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cuello
+    ctx.fillRect(turtleX - 70, turtleY - 10, 30, 20);
+    
+    // Cuerpo principal (sin caparazón)
+    ctx.fillStyle = '#9CCC65';
+    ctx.beginPath();
+    ctx.ellipse(turtleX, turtleY, 70, 50, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Patas
+    ctx.fillStyle = '#7CB342';
+    // Pata delantera izquierda
+    ctx.beginPath();
+    ctx.ellipse(turtleX - 50, turtleY + 40, 15, 25, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pata delantera derecha
+    ctx.beginPath();
+    ctx.ellipse(turtleX + 50, turtleY + 40, 15, 25, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pata trasera izquierda
+    ctx.beginPath();
+    ctx.ellipse(turtleX - 30, turtleY + 50, 15, 25, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pata trasera derecha
+    ctx.beginPath();
+    ctx.ellipse(turtleX + 30, turtleY + 50, 15, 25, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cola
+    ctx.beginPath();
+    ctx.moveTo(turtleX + 60, turtleY);
+    ctx.lineTo(turtleX + 80, turtleY + 10);
+    ctx.lineTo(turtleX + 70, turtleY);
+    ctx.fill();
+    
+    // Ojos tristes
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(turtleX - 70, turtleY - 5, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(turtleX - 55, turtleY - 5, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pupilas mirando hacia abajo (triste)
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(turtleX - 70, turtleY - 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(turtleX - 55, turtleY - 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Boca triste
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(turtleX - 62, turtleY + 8, 8, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+}
+
+// Dibujar tortuga feliz con caparazón
+function drawHappyTurtle() {
+    // Cuerpo (verde)
+    ctx.fillStyle = '#7CB342';
+    
+    // Cabeza
+    ctx.beginPath();
+    ctx.arc(turtleX - 60, turtleY, 30, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cuello
+    ctx.fillRect(turtleX - 70, turtleY - 10, 30, 20);
+    
+    // Caparazón con letra T
+    const gradient = ctx.createRadialGradient(turtleX - 10, turtleY - 10, 10, turtleX, turtleY, 70);
+    gradient.addColorStop(0, '#8D6E63');
+    gradient.addColorStop(1, '#5D4037');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(turtleX, turtleY, 70, 50, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Patrón del caparazón
+    ctx.strokeStyle = '#6D4C41';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(turtleX, turtleY, 20 + i * 15, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    // Letra T en el caparazón
+    ctx.font = 'bold 60px Arial';
+    ctx.fillStyle = '#FFD700';
+    ctx.strokeStyle = '#FF6B00';
+    ctx.lineWidth = 3;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText('T', turtleX, turtleY);
+    ctx.fillText('T', turtleX, turtleY);
+    
+    // Patas
+    ctx.fillStyle = '#7CB342';
+    // Pata delantera izquierda
+    ctx.beginPath();
+    ctx.ellipse(turtleX - 50, turtleY + 40, 15, 25, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pata delantera derecha
+    ctx.beginPath();
+    ctx.ellipse(turtleX + 50, turtleY + 40, 15, 25, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pata trasera izquierda
+    ctx.beginPath();
+    ctx.ellipse(turtleX - 30, turtleY + 50, 15, 25, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pata trasera derecha
+    ctx.beginPath();
+    ctx.ellipse(turtleX + 30, turtleY + 50, 15, 25, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cola
+    ctx.beginPath();
+    ctx.moveTo(turtleX + 60, turtleY);
+    ctx.lineTo(turtleX + 80, turtleY + 10);
+    ctx.lineTo(turtleX + 70, turtleY);
+    ctx.fill();
+    
+    // Ojos felices
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(turtleX - 70, turtleY - 5, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(turtleX - 55, turtleY - 5, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pupilas
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(turtleX - 70, turtleY - 5, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(turtleX - 55, turtleY - 5, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Sonrisa
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(turtleX - 62, turtleY + 5, 8, 0, Math.PI);
+    ctx.stroke();
+}
+
+// Dibujar caparazón
+function drawShell(shell) {
+    const size = 80;
+    const x = shell.x;
+    const y = shell.y;
+    
+    // Sombra
+    if (!shell.dragging) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(x + 5, y + 5, size/2, size/2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Caparazón
+    const gradient = ctx.createRadialGradient(x - 10, y - 10, 10, x, y, size/2);
+    gradient.addColorStop(0, '#A1887F');
+    gradient.addColorStop(1, '#6D4C41');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(x, y, size/2, size/2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Borde si está siendo arrastrado
+    if (shell.dragging) {
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size/2 + 2, size/2.5 + 2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    // Patrón
+    ctx.strokeStyle = '#5D4037';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x, y, size/3, size/4, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Letra
+    ctx.font = 'bold 40px Arial';
+    ctx.fillStyle = '#FFD700';
+    ctx.strokeStyle = '#FF6B00';
+    ctx.lineWidth = 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText(shell.letter, x, y);
+    ctx.fillText(shell.letter, x, y);
+}
+
+// Manejar inicio de arrastre
+function handleStart(e) {
+    e.preventDefault();
+    if (completed) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    // Verificar si tocó algún caparazón
+    for (let i = shells.length - 1; i >= 0; i--) {
+        const shell = shells[i];
+        const distance = Math.sqrt(Math.pow(pos.x - shell.x, 2) + Math.pow(pos.y - shell.y, 2));
+        
+        if (distance < 40) {
+            draggedShell = shell;
+            shell.dragging = true;
+            offsetX = pos.x - shell.x;
+            offsetY = pos.y - shell.y;
+            break;
+        }
+    }
+}
+
+// Manejar movimiento
+function handleMove(e) {
+    e.preventDefault();
+    if (!draggedShell) return;
+    
+    const pos = getInputPosition(e, canvas);
+    draggedShell.x = pos.x - offsetX;
+    draggedShell.y = pos.y - offsetY;
+}
+
+// Manejar fin de arrastre
+function handleEnd(e) {
+    e.preventDefault();
+    if (!draggedShell) return;
+    
+    const shell = draggedShell;
+    shell.dragging = false;
+    
+    // Verificar si está cerca de la tortuga
+    const distX = Math.abs(shell.x - turtleX);
+    const distY = Math.abs(shell.y - turtleY);
+    
+    if (distX < 80 && distY < 60) {
+        if (shell.correct) {
+            // ¡Correcto!
+            completed = true;
+            celebrationTimer = 0;
+        } else {
+            // Incorrecto - volver a posición original
+            shell.x = shell.x < 300 ? 100 : (shell.x < 450 ? 300 : 500);
+            shell.y = 400;
+        }
+    }
+    
+    draggedShell = null;
+}
+
+// Event listeners
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#667eea');
+    gradient.addColorStop(1, '#764ba2');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Título
+    ctx.font = 'bold 32px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'center';
+    ctx.strokeText('🐢 El Caparazón de la Tortuga', canvas.width / 2, 40);
+    ctx.fillText('🐢 El Caparazón de la Tortuga', canvas.width / 2, 40);
+    
+    // Instrucciones
+    if (!completed) {
+        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.strokeText('Arrastra el caparazón con la letra T', canvas.width / 2, 80);
+        ctx.fillText('Arrastra el caparazón con la letra T', canvas.width / 2, 80);
+    }
+    
+    // Dibujar tortuga
+    if (completed) {
+        drawHappyTurtle();
+    } else {
+        drawSadTurtle();
+    }
+    
+    // Dibujar caparazones (solo si no está completado)
+    if (!completed) {
+        shells.forEach(shell => drawShell(shell));
+    }
+    
+    // Celebración
+    if (completed) {
+        celebrationTimer++;
+        
+        if (celebrationTimer > 60) {
+            // Fondo oscuro
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Mensaje
+            ctx.font = 'bold 70px Arial';
+            ctx.fillStyle = '#FFD700';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 8;
+            ctx.textAlign = 'center';
+            ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
+            ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
+            
+            ctx.font = 'bold 28px Arial';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 4;
+            ctx.strokeText('¡La tortuga está feliz!', canvas.width / 2, canvas.height / 2 + 20);
+            ctx.fillText('¡La tortuga está feliz!', canvas.width / 2, canvas.height / 2 + 20);
+            
+            // Estrellas
+            for (let i = 0; i < 15; i++) {
+                const angle = (celebrationTimer * 0.05 + i * 0.4) % (Math.PI * 2);
+                const radius = 150 + Math.sin(celebrationTimer * 0.1 + i) * 30;
+                const x = canvas.width / 2 + Math.cos(angle) * radius;
+                const y = canvas.height / 2 + Math.sin(angle) * radius;
+                const size = 4 + Math.sin(celebrationTimer * 0.2 + i) * 3;
+                
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Reiniciar después de 8 segundos
+        if (celebrationTimer > 480) {
+            completed = false;
+            celebrationTimer = 0;
+            shuffleShells();
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// Iniciar
+shuffleShells();
+gameLoop();
+</script>
 {% endblock %}
