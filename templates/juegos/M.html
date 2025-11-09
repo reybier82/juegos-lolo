@@ -42,15 +42,28 @@ let keys = {};
 let spawnTimer = 0;
 const spawnInterval = 90; // Frames entre frutas (1.5 segundos)
 
-// Crear una nueva fruta cayendo
+// Crear una nueva fruta cayendo desde las ramas del árbol
 function spawnFruit() {
     const types = ['apple', 'apple', 'orange', 'pineapple']; // Más probabilidad de manzanas
     const type = types[Math.floor(Math.random() * types.length)];
     
+    // Posiciones de las ramas donde pueden caer frutas
+    const branchPositions = [
+        { x: 280, y: 200 },  // Rama izquierda
+        { x: 310, y: 150 },  // Rama superior izquierda
+        { x: 350, y: 160 },  // Rama media izquierda
+        { x: 400, y: 140 },  // Rama central
+        { x: 450, y: 160 },  // Rama media derecha
+        { x: 490, y: 150 },  // Rama superior derecha
+        { x: 520, y: 200 }   // Rama derecha
+    ];
+    
+    const branch = branchPositions[Math.floor(Math.random() * branchPositions.length)];
+    
     fruits.push({
         type: type,
-        x: 300 + Math.random() * 200, // Caen desde el área del árbol
-        y: 50,
+        x: branch.x + (Math.random() * 40 - 20), // Variación alrededor de la rama
+        y: branch.y,
         speed: 2 + Math.random() * 1,
         collected: false,
         missed: false
@@ -78,34 +91,84 @@ function getInputPosition(e, canvas) {
     };
 }
 
-// Dibujar árbol con tronco en el suelo
+// Dibujar árbol realista con tronco en el suelo
 function drawTree() {
-    // Tronco desde el suelo
-    ctx.fillStyle = '#8B4513';
-    ctx.fillRect(360, 200, 80, 350);
+    // Tronco principal desde el suelo
+    ctx.fillStyle = '#654321';
+    ctx.beginPath();
+    ctx.moveTo(380, 550);
+    ctx.lineTo(370, 200);
+    ctx.lineTo(430, 200);
+    ctx.lineTo(420, 550);
+    ctx.closePath();
+    ctx.fill();
     
-    // Textura del tronco
-    ctx.strokeStyle = '#654321';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 5; i++) {
+    // Textura del tronco (líneas verticales)
+    ctx.strokeStyle = '#4a2f1a';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 6; i++) {
         ctx.beginPath();
-        ctx.moveTo(370 + i * 15, 250);
-        ctx.lineTo(365 + i * 15, 500);
+        ctx.moveTo(375 + i * 10, 220);
+        ctx.lineTo(378 + i * 10, 540);
         ctx.stroke();
     }
     
-    // Copa del árbol grande
-    ctx.fillStyle = '#228B22';
-    ctx.beginPath();
-    ctx.arc(400, 180, 180, 0, Math.PI * 2);
-    ctx.fill();
+    // Ramas principales
+    ctx.strokeStyle = '#654321';
+    ctx.lineWidth = 15;
+    ctx.lineCap = 'round';
     
-    // Hojas más oscuras para profundidad
+    // Rama izquierda
+    ctx.beginPath();
+    ctx.moveTo(385, 250);
+    ctx.quadraticCurveTo(320, 220, 280, 200);
+    ctx.stroke();
+    
+    // Rama derecha
+    ctx.beginPath();
+    ctx.moveTo(415, 250);
+    ctx.quadraticCurveTo(480, 220, 520, 200);
+    ctx.stroke();
+    
+    // Rama superior izquierda
+    ctx.beginPath();
+    ctx.moveTo(390, 220);
+    ctx.quadraticCurveTo(340, 180, 310, 150);
+    ctx.stroke();
+    
+    // Rama superior derecha
+    ctx.beginPath();
+    ctx.moveTo(410, 220);
+    ctx.quadraticCurveTo(460, 180, 490, 150);
+    ctx.stroke();
+    
+    // Copa del árbol (múltiples círculos para profundidad)
+    // Capa trasera (más oscura)
     ctx.fillStyle = '#1a6b1a';
     ctx.beginPath();
-    ctx.arc(320, 150, 120, 0, Math.PI * 2);
-    ctx.arc(480, 150, 120, 0, Math.PI * 2);
-    ctx.arc(400, 100, 100, 0, Math.PI * 2);
+    ctx.arc(280, 200, 70, 0, Math.PI * 2);
+    ctx.arc(520, 200, 70, 0, Math.PI * 2);
+    ctx.arc(310, 150, 60, 0, Math.PI * 2);
+    ctx.arc(490, 150, 60, 0, Math.PI * 2);
+    ctx.arc(400, 120, 80, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Capa media
+    ctx.fillStyle = '#228B22';
+    ctx.beginPath();
+    ctx.arc(300, 180, 75, 0, Math.PI * 2);
+    ctx.arc(500, 180, 75, 0, Math.PI * 2);
+    ctx.arc(400, 140, 90, 0, Math.PI * 2);
+    ctx.arc(350, 160, 70, 0, Math.PI * 2);
+    ctx.arc(450, 160, 70, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Capa frontal (más clara)
+    ctx.fillStyle = '#32CD32';
+    ctx.beginPath();
+    ctx.arc(320, 170, 60, 0, Math.PI * 2);
+    ctx.arc(480, 170, 60, 0, Math.PI * 2);
+    ctx.arc(400, 150, 70, 0, Math.PI * 2);
     ctx.fill();
 }
 
