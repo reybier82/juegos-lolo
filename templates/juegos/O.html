@@ -122,16 +122,6 @@ function drawCave() {
     ctx.beginPath();
     ctx.ellipse(400, 380, 180, 120, 0, 0, Math.PI * 2);
     ctx.fill();
-    
-    // Textura de roca
-    ctx.fillStyle = '#4a3528';
-    for (let i = 0; i < 20; i++) {
-        const x = 400 + (Math.random() - 0.5) * 350;
-        const y = 380 + (Math.random() - 0.5) * 250;
-        ctx.beginPath();
-        ctx.arc(x, y, Math.random() * 10 + 5, 0, Math.PI * 2);
-        ctx.fill();
-    }
 }
 
 // Dibujar oso dormido
