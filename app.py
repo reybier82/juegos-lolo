@@ -34,7 +34,7 @@ JUEGOS = {
     'R': {'nombre': 'Rompecabezas', 'descripcion': 'Arrastra las piezas para formar la letra R'},
     'S': {'nombre': 'La Serpiente Comilona', 'descripcion': 'Arrastra la serpiente para comer todas las hojas'},
     'T': {'nombre': 'El Caparazón de la Tortuga', 'descripcion': 'Arrastra el caparazón con la letra T'},
-    'U': {'nombre': 'Uvas para Contar', 'descripcion': 'Cuenta las uvas'},
+    'U': {'nombre': 'El Laberinto de la Uva', 'descripcion': 'Lleva la uva hasta la letra U a través del laberinto'},
     'V': {'nombre': 'Volar Mariposas', 'descripcion': 'Haz volar mariposas'},
     'W': {'nombre': 'Waffles', 'descripcion': 'Decora waffles deliciosos'},
     'X': {'nombre': 'Xilófono', 'descripcion': 'Toca el xilófono musical'},

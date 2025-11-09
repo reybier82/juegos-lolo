@@ -1,19 +1,414 @@
 {% extends "base.html" %}
 
-{% block title %}Letra U - Uvas para Contar{% endblock %}
+{% block title %}Letra U - El Laberinto de la Uva{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🍇 Letra U - Uvas para Contar</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🍇 Letra U - El Laberinto de la Uva</h1>
+    <p class="game-description">¡Lleva la uva hasta la letra U a través del laberinto!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+const mazeStartX = 100;
+const mazeStartY = 100;
+const mazeWidth = 600;
+const mazeHeight = 400;
+const pathWidth = 50;
+
+let grapeX = mazeStartX + 25;
+let grapeY = mazeStartY + 25;
+let isDrawing = false;
+let completed = false;
+let celebrationTimer = 0;
+let failed = false;
+
+// Definir paredes del laberinto (líneas)
+const walls = [
+    // Borde exterior
+    { x1: mazeStartX, y1: mazeStartY, x2: mazeStartX + mazeWidth, y2: mazeStartY }, // Top
+    { x1: mazeStartX + mazeWidth, y1: mazeStartY, x2: mazeStartX + mazeWidth, y2: mazeStartY + mazeHeight }, // Right
+    { x1: mazeStartX + mazeWidth, y1: mazeStartY + mazeHeight, x2: mazeStartX, y2: mazeStartY + mazeHeight }, // Bottom
+    { x1: mazeStartX, y1: mazeStartY + mazeHeight, x2: mazeStartX, y2: mazeStartY + 50 }, // Left (con entrada)
+    
+    // Paredes internas (laberinto sencillo para niños)
+    { x1: mazeStartX + 150, y1: mazeStartY, x2: mazeStartX + 150, y2: mazeStartY + 100 },
+    { x1: mazeStartX, y1: mazeStartY + 150, x2: mazeStartX + 250, y2: mazeStartY + 150 },
+    { x1: mazeStartX + 250, y1: mazeStartY + 50, x2: mazeStartX + 250, y2: mazeStartY + 250 },
+    { x1: mazeStartX + 350, y1: mazeStartY + 150, x2: mazeStartX + 350, y2: mazeStartY + 400 },
+    { x1: mazeStartX + 150, y1: mazeStartY + 250, x2: mazeStartX + 450, y2: mazeStartY + 250 },
+    { x1: mazeStartX + 450, y1: mazeStartY + 50, x2: mazeStartX + 450, y2: mazeStartY + 200 },
+    { x1: mazeStartX + 500, y1: mazeStartY + 300, x2: mazeStartX + 600, y2: mazeStartY + 300 },
+];
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Verificar si un punto está cerca de la uva
+function isNearGrape(x, y) {
+    const distance = Math.sqrt(Math.pow(x - grapeX, 2) + Math.pow(y - grapeY, 2));
+    return distance < 30;
+}
+
+// Verificar si un punto está cerca de la meta (letra U)
+function isNearGoal(x, y) {
+    const goalX = mazeStartX + mazeWidth - 50;
+    const goalY = mazeStartY + mazeHeight - 50;
+    const distance = Math.sqrt(Math.pow(x - goalX, 2) + Math.pow(y - goalY, 2));
+    return distance < 40;
+}
+
+// Verificar colisión con paredes
+function checkWallCollision(x, y) {
+    const grapeRadius = 15;
+    
+    for (let wall of walls) {
+        const distance = distanceToLineSegment(x, y, wall.x1, wall.y1, wall.x2, wall.y2);
+        if (distance < grapeRadius) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Calcular distancia de un punto a un segmento de línea
+function distanceToLineSegment(px, py, x1, y1, x2, y2) {
+    const A = px - x1;
+    const B = py - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+    
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    
+    if (lenSq !== 0) {
+        param = dot / lenSq;
+    }
+    
+    let xx, yy;
+    
+    if (param < 0) {
+        xx = x1;
+        yy = y1;
+    } else if (param > 1) {
+        xx = x2;
+        yy = y2;
+    } else {
+        xx = x1 + param * C;
+        yy = y1 + param * D;
+    }
+    
+    const dx = px - xx;
+    const dy = py - yy;
+    
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Dibujar uva
+function drawGrape(x, y) {
+    // Racimo de uvas (3 uvas moradas)
+    ctx.fillStyle = '#9C27B0';
+    
+    // Uva superior
+    ctx.beginPath();
+    ctx.arc(x, y - 8, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Uvas inferiores
+    ctx.beginPath();
+    ctx.arc(x - 7, y + 5, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.arc(x + 7, y + 5, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Brillos
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.arc(x - 3, y - 10, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x - 10, y + 3, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + 5, y + 3, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Tallo
+    ctx.strokeStyle = '#795548';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 16);
+    ctx.lineTo(x, y - 8);
+    ctx.stroke();
+    
+    // Hoja
+    ctx.fillStyle = '#4CAF50';
+    ctx.beginPath();
+    ctx.ellipse(x + 5, y - 18, 6, 4, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Dibujar letra U en la meta
+function drawGoalU() {
+    const x = mazeStartX + mazeWidth - 50;
+    const y = mazeStartY + mazeHeight - 50;
+    
+    // Círculo de fondo
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(x, y, 35, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Borde
+    ctx.strokeStyle = '#FF9800';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    // Letra U
+    ctx.font = 'bold 50px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#FF6B00';
+    ctx.lineWidth = 3;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText('U', x, y);
+    ctx.fillText('U', x, y);
+}
+
+// Dibujar laberinto
+function drawMaze() {
+    // Fondo del laberinto
+    ctx.fillStyle = '#E8F5E9';
+    ctx.fillRect(mazeStartX, mazeStartY, mazeWidth, mazeHeight);
+    
+    // Paredes
+    ctx.strokeStyle = '#2E7D32';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    
+    walls.forEach(wall => {
+        ctx.beginPath();
+        ctx.moveTo(wall.x1, wall.y1);
+        ctx.lineTo(wall.x2, wall.y2);
+        ctx.stroke();
+    });
+    
+    // Sombra interior
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.lineWidth = 4;
+    walls.forEach(wall => {
+        ctx.beginPath();
+        ctx.moveTo(wall.x1 + 2, wall.y1 + 2);
+        ctx.lineTo(wall.x2 + 2, wall.y2 + 2);
+        ctx.stroke();
+    });
+}
+
+// Manejar inicio
+function handleStart(e) {
+    e.preventDefault();
+    if (completed) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    if (isNearGrape(pos.x, pos.y)) {
+        isDrawing = true;
+        failed = false;
+    }
+}
+
+// Manejar movimiento
+function handleMove(e) {
+    e.preventDefault();
+    if (!isDrawing || completed) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    // Verificar colisión con paredes
+    if (checkWallCollision(pos.x, pos.y)) {
+        // Chocó con una pared
+        failed = true;
+        isDrawing = false;
+        
+        // Reiniciar posición de la uva
+        setTimeout(() => {
+            grapeX = mazeStartX + 25;
+            grapeY = mazeStartY + 25;
+            failed = false;
+        }, 500);
+        return;
+    }
+    
+    // Mover la uva
+    grapeX = pos.x;
+    grapeY = pos.y;
+    
+    // Verificar si llegó a la meta
+    if (isNearGoal(pos.x, pos.y)) {
+        completed = true;
+        celebrationTimer = 0;
+        isDrawing = false;
+    }
+}
+
+// Manejar fin
+function handleEnd(e) {
+    e.preventDefault();
+    isDrawing = false;
+}
+
+// Event listeners
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#667eea');
+    gradient.addColorStop(1, '#764ba2');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Título
+    ctx.font = 'bold 32px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'center';
+    ctx.strokeText('🍇 El Laberinto de la Uva', canvas.width / 2, 50);
+    ctx.fillText('🍇 El Laberinto de la Uva', canvas.width / 2, 50);
+    
+    // Instrucciones
+    if (!completed && !failed) {
+        ctx.font = 'bold 18px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.strokeText('Arrastra la uva hasta la letra U sin tocar las paredes', canvas.width / 2, 80);
+        ctx.fillText('Arrastra la uva hasta la letra U sin tocar las paredes', canvas.width / 2, 80);
+    }
+    
+    // Mensaje de error
+    if (failed) {
+        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = '#FF5252';
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 3;
+        ctx.strokeText('¡Tocaste la pared! Intenta de nuevo', canvas.width / 2, 80);
+        ctx.fillText('¡Tocaste la pared! Intenta de nuevo', canvas.width / 2, 80);
+    }
+    
+    // Dibujar laberinto
+    drawMaze();
+    
+    // Dibujar meta
+    drawGoalU();
+    
+    // Dibujar uva
+    if (!completed) {
+        drawGrape(grapeX, grapeY);
+    }
+    
+    // Celebración
+    if (completed) {
+        celebrationTimer++;
+        
+        if (celebrationTimer > 30) {
+            // Fondo oscuro
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Mensaje
+            ctx.font = 'bold 70px Arial';
+            ctx.fillStyle = '#FFD700';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 8;
+            ctx.textAlign = 'center';
+            ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
+            ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 40);
+            
+            ctx.font = 'bold 28px Arial';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 4;
+            ctx.strokeText('¡Completaste el laberinto!', canvas.width / 2, canvas.height / 2 + 20);
+            ctx.fillText('¡Completaste el laberinto!', canvas.width / 2, canvas.height / 2 + 20);
+            
+            // Estrellas
+            for (let i = 0; i < 15; i++) {
+                const angle = (celebrationTimer * 0.05 + i * 0.4) % (Math.PI * 2);
+                const radius = 150 + Math.sin(celebrationTimer * 0.1 + i) * 30;
+                const x = canvas.width / 2 + Math.cos(angle) * radius;
+                const y = canvas.height / 2 + Math.sin(angle) * radius;
+                const size = 4 + Math.sin(celebrationTimer * 0.2 + i) * 3;
+                
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Reiniciar después de 8 segundos
+        if (celebrationTimer > 480) {
+            completed = false;
+            celebrationTimer = 0;
+            grapeX = mazeStartX + 25;
+            grapeY = mazeStartY + 25;
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// Iniciar
+gameLoop();
+</script>
 {% endblock %}
