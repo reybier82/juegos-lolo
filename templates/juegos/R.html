@@ -110,7 +110,7 @@ function getInputPosition(e, canvas) {
 }
 
 // Dibujar pieza del rompecabezas
-function drawPiece(piece, offsetX = 0, offsetY = 0) {
+function drawPiece(piece, offsetX = 0, offsetY = 0, showBorders = true) {
     if (!puzzleImg.complete) return;
     
     const x = piece.currentX + offsetX;
@@ -126,7 +126,7 @@ function drawPiece(piece, offsetX = 0, offsetY = 0) {
     ctx.save();
     
     // Borde si está siendo arrastrada
-    if (piece.dragging) {
+    if (piece.dragging && showBorders) {
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 4;
         ctx.strokeRect(x - 2, y - 2, pieceSize + 4, pieceSize + 4);
@@ -143,10 +143,12 @@ function drawPiece(piece, offsetX = 0, offsetY = 0) {
         pieceSize, pieceSize // dWidth, dHeight
     );
     
-    // Borde de la pieza
-    ctx.strokeStyle = piece.placed ? '#4CAF50' : '#FFFFFF';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x, y, pieceSize, pieceSize);
+    // Borde de la pieza (solo si showBorders es true)
+    if (showBorders) {
+        ctx.strokeStyle = piece.placed ? '#4CAF50' : '#FFFFFF';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, pieceSize, pieceSize);
+    }
     
     ctx.restore();
 }
@@ -348,8 +350,8 @@ function gameLoop() {
             puzzleOffsetX = (targetCenterX - currentCenterX) * easeProgress;
             puzzleOffsetY = (targetCenterY - currentCenterY) * easeProgress;
             
-            // Dibujar piezas con offset
-            pieces.forEach(piece => drawPiece(piece, puzzleOffsetX, puzzleOffsetY));
+            // Dibujar piezas con offset (sin bordes)
+            pieces.forEach(piece => drawPiece(piece, puzzleOffsetX, puzzleOffsetY, false));
             
             // Efecto de brillo que crece
             ctx.save();
@@ -388,8 +390,8 @@ function gameLoop() {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Dibujar piezas en el centro con brillo
-            pieces.forEach(piece => drawPiece(piece, puzzleOffsetX, puzzleOffsetY));
+            // Dibujar piezas en el centro con brillo (sin bordes)
+            pieces.forEach(piece => drawPiece(piece, puzzleOffsetX, puzzleOffsetY, false));
             
             // Efecto de brillo continuo
             ctx.save();
