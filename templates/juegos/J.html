@@ -32,7 +32,7 @@ window.addEventListener('resize', resizeCanvas);
 
 // Variables del juego
 const giraffeX = 650; // Jirafa a la derecha
-const giraffeY = 450; // En el suelo
+const giraffeY = 480; // En el suelo
 let giraffeSize = 1;
 let foodEaten = { jamon: false, jojoto: false, jugo: false };
 let draggingFood = null;
@@ -52,7 +52,7 @@ const jojotoImg = new Image();
 giraffeImg.src = '/assets/img/jirafa.png';
 jamonImg.src = '/assets/img/jamon.png';
 jugoImg.src = '/assets/img/jugo.png';
-jojotoImg.src = '/assets/img/jojoto.avif';
+jojotoImg.src = '/assets/img/jojoto.png';
 
 // Dibujar jirafa
 function drawGiraffe() {
@@ -62,10 +62,10 @@ function drawGiraffe() {
     ctx.translate(giraffeX, giraffeY);
     ctx.scale(giraffeSize, giraffeSize);
     
-    // Dibujar la imagen de la jirafa centrada
+    // Dibujar la imagen de la jirafa centrada y en el suelo
     const imgWidth = 220;
     const imgHeight = 320;
-    ctx.drawImage(giraffeImg, -imgWidth/2, -imgHeight + 80, imgWidth, imgHeight);
+    ctx.drawImage(giraffeImg, -imgWidth/2, -imgHeight + 50, imgWidth, imgHeight);
     
     ctx.restore();
 }
