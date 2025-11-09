@@ -1,19 +1,267 @@
 {% extends "base.html" %}
 
-{% block title %}Letra I - Iluminar Estrellas{% endblock %}
+{% block title %}Letra I - Colorear la Isla{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">⭐ Letra I - Iluminar Estrellas</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🏝️ Letra I - Colorear la Isla</h1>
+    <p class="game-description">¡Colorea la isla con tus dedos!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
-<div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
+<!-- Paleta de colores -->
+<div style="text-align: center; padding: 15px 20px;">
+    <div id="colorPalette" style="display: inline-block;">
+        <!-- Los colores se generarán dinámicamente -->
     </div>
 </div>
+
+<div class="game-canvas-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let selectedColor = '#FFD700'; // Color por defecto: amarillo
+let isDrawing = false;
+let isErasing = false; // Modo borrador
+let skyPainted = false; // Controlar si ya se pintó el cielo
+let islaImg = new Image();
+let imageLoaded = false;
+
+// Paleta de colores básicos de la isla
+const colorPalette = [
+    { name: 'Amarillo (Sol)', color: '#FFD700' },
+    { name: 'Azul (Mar)', color: '#1E90FF' },
+    { name: 'Arena', color: '#F4A460' },
+    { name: 'Café (Tronco)', color: '#8B4513' },
+    { name: 'Verde (Hojas)', color: '#228B22' },
+    { name: 'Naranja', color: '#FF8C00' },
+    { name: 'Celeste', color: '#87CEEB' },
+    { name: 'Borrador', color: 'eraser', isEraser: true }
+];
+
+// Función para pintar el cielo automáticamente como FONDO
+function paintSky() {
+    // Crear degradado de cielo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
+    gradient.addColorStop(0, '#87CEEB'); // Azul cielo claro arriba
+    gradient.addColorStop(1, '#B0E0E6'); // Azul más claro abajo
+    
+    // Pintar TODO el fondo con el cielo
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// Cargar imagen de la isla
+islaImg.src = '/assets/img/isla.png';
+islaImg.onload = () => {
+    imageLoaded = true;
+    
+    // PRIMERO pintar el cielo como fondo
+    paintSky();
+    
+    // DESPUÉS dibujar la imagen encima del cielo
+    // Recortar desde y=80 para eliminar el encabezado "COLORING PAGE"
+    const sourceY = 80;
+    const sourceHeight = islaImg.height - sourceY;
+    ctx.drawImage(islaImg, 0, sourceY, islaImg.width, sourceHeight, 0, 0, canvas.width, canvas.height);
+    
+    skyPainted = true;
+};
+
+// Crear paleta de colores en el HTML
+function createColorPalette() {
+    const paletteDiv = document.getElementById('colorPalette');
+    paletteDiv.innerHTML = '';
+    
+    colorPalette.forEach((colorItem, index) => {
+        const colorBtn = document.createElement('button');
+        
+        // Estilo especial para el borrador
+        if (colorItem.isEraser) {
+            colorBtn.style.cssText = `
+                width: 60px;
+                height: 60px;
+                margin: 5px;
+                border: 3px solid #333;
+                border-radius: 10px;
+                cursor: pointer;
+                background: linear-gradient(45deg, #FFB6C1 25%, #FFF 25%, #FFF 50%, #FFB6C1 50%, #FFB6C1 75%, #FFF 75%, #FFF);
+                background-size: 20px 20px;
+                transition: transform 0.2s;
+                box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+                font-size: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            colorBtn.innerHTML = '✂️'; // Emoji de tijeras para borrador
+        } else {
+            colorBtn.style.cssText = `
+                width: 60px;
+                height: 60px;
+                margin: 5px;
+                border: 3px solid #333;
+                border-radius: 10px;
+                cursor: pointer;
+                background-color: ${colorItem.color};
+                transition: transform 0.2s;
+                box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            `;
+        }
+        
+        // Marcar el primer color como seleccionado
+        if (index === 0 && !isErasing) {
+            colorBtn.style.transform = 'scale(1.2)';
+            colorBtn.style.border = '5px solid #FF6B6B';
+        }
+        
+        colorBtn.onclick = () => {
+            if (colorItem.isEraser) {
+                isErasing = true;
+                selectedColor = null;
+            } else {
+                isErasing = false;
+                selectedColor = colorItem.color;
+            }
+            
+            // Resaltar el botón seleccionado
+            document.querySelectorAll('#colorPalette button').forEach(btn => {
+                btn.style.transform = 'scale(1)';
+                btn.style.border = '3px solid #333';
+            });
+            colorBtn.style.transform = 'scale(1.2)';
+            colorBtn.style.border = '5px solid #FF6B6B';
+        };
+        paletteDiv.appendChild(colorBtn);
+    });
+}
+
+createColorPalette();
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar en el canvas
+function draw(x, y) {
+    if (!imageLoaded) return;
+    
+    if (isErasing) {
+        // Modo borrador: redibujar la imagen original en esa área
+        const brushSize = 20;
+        const sourceY = 80;
+        const sourceHeight = islaImg.height - sourceY;
+        
+        // Calcular las coordenadas de origen en la imagen
+        const sourceX = (x / canvas.width) * islaImg.width;
+        const sourceYPos = sourceY + ((y / canvas.height) * sourceHeight);
+        const sourceSize = (brushSize / canvas.width) * islaImg.width;
+        
+        ctx.drawImage(
+            islaImg,
+            sourceX - sourceSize / 2,
+            sourceYPos - sourceSize / 2,
+            sourceSize,
+            sourceSize,
+            x - brushSize / 2,
+            y - brushSize / 2,
+            brushSize,
+            brushSize
+        );
+        
+        // Borrar el área
+    } else {
+        // Modo colorear normal con pincel más fino
+        ctx.fillStyle = selectedColor;
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2); // Reducido de 15 a 8 píxeles
+        ctx.fill();
+    }
+}
+
+// Manejo de eventos para dibujar
+function handleStart(e) {
+    e.preventDefault();
+    isDrawing = true;
+    const pos = getInputPosition(e, canvas);
+    draw(pos.x, pos.y);
+}
+
+function handleMove(e) {
+    e.preventDefault();
+    if (!isDrawing) return;
+    const pos = getInputPosition(e, canvas);
+    draw(pos.x, pos.y);
+}
+
+function handleEnd(e) {
+    e.preventDefault();
+    isDrawing = false;
+}
+
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Loop del juego (sin celebración ni barra de progreso)
+function gameLoop() {
+    // El juego solo dibuja, sin mostrar mensajes ni barras
+    requestAnimationFrame(gameLoop);
+}
+
+// Cargar y mostrar la imagen
+islaImg.onload = () => {
+    imageLoaded = true;
+    
+    // PRIMERO pintar el cielo como fondo
+    paintSky();
+    
+    // DESPUÉS dibujar la imagen encima
+    const sourceY = 80;
+    const sourceHeight = islaImg.height - sourceY;
+    ctx.drawImage(islaImg, 0, sourceY, islaImg.width, sourceHeight, 0, 0, canvas.width, canvas.height);
+    
+    skyPainted = true;
+    
+    gameLoop();
+};
+</script>
 {% endblock %}

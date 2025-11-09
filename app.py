@@ -22,7 +22,7 @@ JUEGOS = {
     'F': {'nombre': 'Flores Mágicas', 'descripcion': 'Haz crecer flores tocándolas'},
     'G': {'nombre': 'El Ovillo del Gato', 'descripcion': 'Traza el camino para que el gato llegue al ovillo'},
     'H': {'nombre': '¡Enciende la Hélice!', 'descripcion': 'Gira la hélice para hacer volar el helicóptero'},
-    'I': {'nombre': 'Iluminar Estrellas', 'descripcion': 'Ilumina estrellas con la letra I'},
+    'I': {'nombre': 'Colorear la Isla', 'descripcion': 'Colorea todos los elementos de la isla'},
     'J': {'nombre': 'Jabón y Burbujas', 'descripcion': 'Juega con burbujas de jabón'},
     'K': {'nombre': 'Karaoke', 'descripcion': 'Escucha el sonido de la K'},
     'L': {'nombre': 'Laberinto', 'descripcion': 'Sigue el camino de la letra L'},
