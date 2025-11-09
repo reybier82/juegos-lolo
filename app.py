@@ -20,7 +20,7 @@ JUEGOS = {
     'D': {'nombre': 'Dibujar', 'descripcion': 'Dibuja sobre la letra D'},
     'E': {'nombre': 'La Ducha del Elefante', 'descripcion': 'Arrastra la nube E para darle una ducha al elefante'},
     'F': {'nombre': 'Flores Mágicas', 'descripcion': 'Haz crecer flores tocándolas'},
-    'G': {'nombre': 'Girar', 'descripcion': 'Gira objetos con forma de G'},
+    'G': {'nombre': 'El Ovillo del Gato', 'descripcion': 'Traza el camino para que el ovillo llegue al gato'},
     'H': {'nombre': 'Hacer Música', 'descripcion': 'Toca instrumentos musicales'},
     'I': {'nombre': 'Iluminar Estrellas', 'descripcion': 'Ilumina estrellas con la letra I'},
     'J': {'nombre': 'Jabón y Burbujas', 'descripcion': 'Juega con burbujas de jabón'},

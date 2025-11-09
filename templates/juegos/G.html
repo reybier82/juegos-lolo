@@ -1,19 +1,305 @@
 {% extends "base.html" %}
 
-{% block title %}Letra G - Girar{% endblock %}
+{% block title %}Letra G - El Ovillo del Gato{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🔄 Letra G - Girar</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🐱 Letra G - El Ovillo del Gato</h1>
+    <p class="game-description">¡Traza el camino para que el ovillo llegue al gato!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let score = 0;
+let ballX = 100;  // Esquina superior izquierda
+let ballY = 100;
+let catX = 650;
+let catY = 380;  // Más arriba para que no se mezcle con el piso
+let ballDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let catHappy = false;
+let celebrating = false;
+
+// Cargar imágenes
+const catImg = new Image();
+const ballImg = new Image();
+const floorImg = new Image();
+let catProcessed = null;
+let imagesLoaded = 0;
+
+catImg.src = "/assets/img/gato_ovillo.png";
+ballImg.src = "/assets/img/ovillo.webp";
+floorImg.src = "/assets/img/piso_gato.jpg";
+
+// Cargar audio del gato
+const catSound = new Audio('/assets/audio/gato.mp3');
+
+// Función para procesar imagen del gato y quitar fondo
+function processCatImage(img) {
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = img.width;
+    tempCanvas.height = img.height;
+    
+    tempCtx.drawImage(img, 0, 0);
+    
+    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+    const data = imageData.data;
+    const width = tempCanvas.width;
+    const height = tempCanvas.height;
+    
+    // Hacer transparente el fondo cuadriculado y blanco
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            // Eliminar blancos y grises claros (fondo cuadriculado)
+            if (r > 200 && g > 200 && b > 200) {
+                data[i + 3] = 0;
+            }
+            // Eliminar grises del cuadriculado
+            else if (r > 180 && g > 180 && b > 180 && Math.abs(r - g) < 20 && Math.abs(r - b) < 20) {
+                data[i + 3] = 0;
+            }
+        }
+    }
+    
+    tempCtx.putImageData(imageData, 0, 0);
+    return tempCanvas;
+}
+
+catImg.onload = () => {
+    catProcessed = processCatImage(catImg);
+    imagesLoaded++;
+};
+
+ballImg.onload = () => {
+    imagesLoaded++;
+};
+
+floorImg.onload = () => {
+    imagesLoaded++;
+};
+
+// Dibujar el gato
+function drawCat() {
+    if (imagesLoaded < 2 || !catProcessed) return;
+    
+    const imgWidth = 200;
+    const imgHeight = 200;
+    
+    ctx.drawImage(
+        catProcessed,
+        catX - imgWidth / 2,
+        catY - imgHeight / 2,
+        imgWidth,
+        imgHeight
+    );
+}
+
+// Dibujar el ovillo
+function drawBall() {
+    if (imagesLoaded < 2) return;
+    
+    const imgWidth = 120;
+    const imgHeight = 120;
+    
+    // Sombra si está siendo arrastrado
+    if (ballDragging) {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetX = 5;
+        ctx.shadowOffsetY = 5;
+    }
+    
+    ctx.drawImage(
+        ballImg,
+        ballX - imgWidth / 2,
+        ballY - imgHeight / 2,
+        imgWidth,
+        imgHeight
+    );
+    
+    // Resetear sombra
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+}
+
+// Verificar si el mouse/touch está sobre el ovillo
+function isOverBall(x, y) {
+    const distance = Math.sqrt((x - ballX) ** 2 + (y - ballY) ** 2);
+    return distance < 60;
+}
+
+// Verificar si el ovillo está cerca del gato
+function isBallNearCat() {
+    const distance = Math.sqrt((ballX - catX) ** 2 + (ballY - catY) ** 2);
+    return distance < 100;
+}
+
+// Manejo de eventos de arrastre
+function handleStart(e) {
+    e.preventDefault();
+    if (celebrating) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    if (isOverBall(pos.x, pos.y)) {
+        ballDragging = true;
+        dragOffsetX = pos.x - ballX;
+        dragOffsetY = pos.y - ballY;
+    }
+}
+
+function handleMove(e) {
+    e.preventDefault();
+    if (ballDragging && !celebrating) {
+        const pos = getInputPosition(e, canvas);
+        ballX = pos.x - dragOffsetX;
+        ballY = pos.y - dragOffsetY;
+        
+        // Limitar dentro del canvas
+        ballX = Math.max(60, Math.min(canvas.width - 60, ballX));
+        ballY = Math.max(60, Math.min(canvas.height - 60, ballY));
+    }
+}
+
+function handleEnd(e) {
+    e.preventDefault();
+    if (ballDragging) {
+        ballDragging = false;
+        
+        // Verificar si el ovillo llegó al gato
+        if (isBallNearCat()) {
+            celebrating = true;
+            catHappy = true;
+            score++;
+            
+            // Reproducir sonido del gato (PRIORITARIO)
+            try {
+                catSound.currentTime = 0;
+                catSound.volume = 1.0;
+                catSound.play();
+            } catch (err) {
+                console.log('Error reproduciendo sonido del gato:', err);
+            }
+            
+            showCelebration('¡El gato tiene su ovillo! 🐱🧶');
+            
+            // Reiniciar después de 3 segundos
+            setTimeout(() => {
+                resetGame();
+            }, 3000);
+        }
+    }
+}
+
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Reiniciar juego
+function resetGame() {
+    ballX = 100;  // Volver a esquina superior izquierda
+    ballY = 100;
+    catHappy = false;
+    celebrating = false;
+    ballDragging = false;
+}
+
+// Loop del juego
+function gameLoop() {
+    // Verificar que las imágenes estén cargadas (ahora son 3: gato, ovillo, piso)
+    if (imagesLoaded < 3) {
+        // Mostrar mensaje de carga
+        ctx.fillStyle = '#FFF9C4';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = 'bold 30px Arial';
+        ctx.fillStyle = '#6A1B9A';
+        ctx.textAlign = 'center';
+        ctx.fillText('Cargando...', canvas.width / 2, canvas.height / 2);
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    
+    // Fondo (pared amarilla suave)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#FFF9C4');
+    gradient.addColorStop(1, '#FFECB3');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Piso de madera (IMAGEN REAL)
+    const floorHeight = 150;
+    const floorY = canvas.height - floorHeight;
+    
+    // Dibujar la imagen del piso
+    ctx.drawImage(
+        floorImg,
+        0,
+        floorY,
+        canvas.width,
+        floorHeight
+    );
+    
+    // IMPORTANTE: Dibujar elementos DESPUÉS del piso (z-index mayor)
+    drawCat();  // Gato se dibuja ENCIMA del piso
+    drawBall(); // Ovillo se dibuja ENCIMA del piso
+    
+    // Instrucciones
+    if (score === 0 && !celebrating) {
+        ctx.font = 'bold 26px Arial';
+        ctx.fillStyle = '#6A1B9A';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 5;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡Arrastra el ovillo hasta el gato!', canvas.width / 2, 40);
+        ctx.fillText('¡Arrastra el ovillo hasta el gato!', canvas.width / 2, 40);
+    }
+    
+    // Puntuación
+    ctx.font = 'bold 30px Arial';
+    ctx.fillStyle = '#E91E63';
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'left';
+    ctx.strokeText(`🐱 Ovillos: ${score}`, 20, canvas.height - 20);
+    ctx.fillText(`🐱 Ovillos: ${score}`, 20, canvas.height - 20);
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// Iniciar juego
+gameLoop();
+</script>
 {% endblock %}

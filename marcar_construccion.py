@@ -6,7 +6,7 @@ Script para marcar juegos como "En Construcción"
 import os
 
 # Juegos que están listos (NO modificar)
-JUEGOS_LISTOS = ['A', 'B', 'C', 'D', 'E', 'F', 'Q']
+JUEGOS_LISTOS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'Q']
 
 # Todas las letras
 TODAS_LETRAS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
@@ -15,7 +15,7 @@ TODAS_LETRAS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
 # Información de cada juego
 JUEGOS_INFO = {
     'E': {'nombre': 'La Ducha del Elefante', 'emoji': '🐘'},
-    'G': {'nombre': 'Girar', 'emoji': '🔄'},
+    'G': {'nombre': 'El Ovillo del Gato', 'emoji': '🐱'},
     'H': {'nombre': 'Hacer Música', 'emoji': '🎵'},
     'I': {'nombre': 'Iluminar Estrellas', 'emoji': '⭐'},
     'J': {'nombre': 'Jabón y Burbujas', 'emoji': '🫧'},
