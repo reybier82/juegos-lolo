@@ -100,9 +100,7 @@ function initPuzzle() {
 
 // Mezclar piezas
 function shufflePieces() {
-    const startY = 420;
-    const spacing = 10;
-    const piecesPerRow = 3;
+    const spacing = 15;
     
     // Mezclar orden
     for (let i = pieces.length - 1; i > 0; i--) {
@@ -110,12 +108,17 @@ function shufflePieces() {
         [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
     }
     
-    // Posicionar piezas mezcladas
+    // Posicionar piezas: 3 a la izquierda y 3 a la derecha
     pieces.forEach((piece, index) => {
-        const row = Math.floor(index / piecesPerRow);
-        const col = index % piecesPerRow;
-        piece.x = 150 + col * (pieceWidth + spacing);
-        piece.y = startY + row * (pieceHeight + spacing);
+        if (index < 3) {
+            // 3 piezas a la izquierda
+            piece.x = 30;
+            piece.y = 150 + index * (pieceHeight + spacing);
+        } else {
+            // 3 piezas a la derecha
+            piece.x = canvas.width - pieceWidth - 30;
+            piece.y = 150 + (index - 3) * (pieceHeight + spacing);
+        }
     });
 }
 
