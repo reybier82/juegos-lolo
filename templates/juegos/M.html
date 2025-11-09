@@ -453,23 +453,15 @@ function gameLoop() {
     
     drawBasket();
     
-    // Instrucciones
-    if (applesCollected === 0 && !celebrating) {
-        ctx.font = 'bold 26px Arial';
-        ctx.fillStyle = '#1565C0';
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 5;
-        ctx.textAlign = 'center';
-        ctx.strokeText('🍎 ¡Mueve la cesta para atrapar las MANZANAS!', canvas.width / 2, 40);
-        ctx.fillText('🍎 ¡Mueve la cesta para atrapar las MANZANAS!', canvas.width / 2, 40);
-    }
-    
     // Contador
     if (!celebrating) {
-        ctx.font = 'bold 22px Arial';
-        ctx.fillStyle = '#333';
-        ctx.textAlign = 'left';
-        ctx.fillText(`Manzanas: ${applesCollected}/${totalApples}`, 20, 40);
+        ctx.font = 'bold 28px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.strokeText(`🍎 Manzanas: ${applesCollected}/${totalApples}`, canvas.width / 2, 40);
+        ctx.fillText(`🍎 Manzanas: ${applesCollected}/${totalApples}`, canvas.width / 2, 40);
     }
     
     // Celebración
