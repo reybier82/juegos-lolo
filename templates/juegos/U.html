@@ -5,7 +5,7 @@
 {% block content %}
 <div class="game-header">
     <h1 class="game-title">🍇 Letra U - El Laberinto de la Uva</h1>
-    <p class="game-description">¡Lleva la uva hasta la letra U a través del laberinto!</p>
+    <p class="game-description">¡Arrastra la letra U hasta la uva a través del laberinto!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
@@ -37,12 +37,16 @@ const mazeWidth = 600;
 const mazeHeight = 400;
 const pathWidth = 50;
 
-let grapeX = mazeStartX + 25;
-let grapeY = mazeStartY + 25;
+// Uva en la meta (esquina inferior derecha)
+const grapeX = mazeStartX + mazeWidth - 50;
+const grapeY = mazeStartY + mazeHeight - 50;
+
+// Letra U comienza en la esquina superior izquierda
+let letterUX = mazeStartX + 25;
+let letterUY = mazeStartY + 25;
 let isDrawing = false;
 let completed = false;
 let celebrationTimer = 0;
-let failed = false;
 
 // Definir paredes del laberinto (líneas)
 const walls = [
@@ -83,65 +87,16 @@ function getInputPosition(e, canvas) {
     };
 }
 
-// Verificar si un punto está cerca de la uva
-function isNearGrape(x, y) {
-    const distance = Math.sqrt(Math.pow(x - grapeX, 2) + Math.pow(y - grapeY, 2));
-    return distance < 30;
+// Verificar si un punto está cerca de la letra U
+function isNearLetterU(x, y) {
+    const distance = Math.sqrt(Math.pow(x - letterUX, 2) + Math.pow(y - letterUY, 2));
+    return distance < 35;
 }
 
-// Verificar si un punto está cerca de la meta (letra U)
-function isNearGoal(x, y) {
-    const goalX = mazeStartX + mazeWidth - 50;
-    const goalY = mazeStartY + mazeHeight - 50;
-    const distance = Math.sqrt(Math.pow(x - goalX, 2) + Math.pow(y - goalY, 2));
-    return distance < 40;
-}
-
-// Verificar colisión con paredes
-function checkWallCollision(x, y) {
-    const grapeRadius = 15;
-    
-    for (let wall of walls) {
-        const distance = distanceToLineSegment(x, y, wall.x1, wall.y1, wall.x2, wall.y2);
-        if (distance < grapeRadius) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// Calcular distancia de un punto a un segmento de línea
-function distanceToLineSegment(px, py, x1, y1, x2, y2) {
-    const A = px - x1;
-    const B = py - y1;
-    const C = x2 - x1;
-    const D = y2 - y1;
-    
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
-    let param = -1;
-    
-    if (lenSq !== 0) {
-        param = dot / lenSq;
-    }
-    
-    let xx, yy;
-    
-    if (param < 0) {
-        xx = x1;
-        yy = y1;
-    } else if (param > 1) {
-        xx = x2;
-        yy = y2;
-    } else {
-        xx = x1 + param * C;
-        yy = y1 + param * D;
-    }
-    
-    const dx = px - xx;
-    const dy = py - yy;
-    
-    return Math.sqrt(dx * dx + dy * dy);
+// Verificar si la letra U llegó a la uva
+function checkReachedGrape() {
+    const distance = Math.sqrt(Math.pow(letterUX - grapeX, 2) + Math.pow(letterUY - grapeY, 2));
+    return distance < 50;
 }
 
 // Dibujar uva
@@ -190,11 +145,8 @@ function drawGrape(x, y) {
     ctx.fill();
 }
 
-// Dibujar letra U en la meta
-function drawGoalU() {
-    const x = mazeStartX + mazeWidth - 50;
-    const y = mazeStartY + mazeHeight - 50;
-    
+// Dibujar letra U (movible)
+function drawLetterU(x, y) {
     // Círculo de fondo
     ctx.fillStyle = '#FFD700';
     ctx.beginPath();
@@ -253,9 +205,8 @@ function handleStart(e) {
     
     const pos = getInputPosition(e, canvas);
     
-    if (isNearGrape(pos.x, pos.y)) {
+    if (isNearLetterU(pos.x, pos.y)) {
         isDrawing = true;
-        failed = false;
     }
 }
 
@@ -266,27 +217,12 @@ function handleMove(e) {
     
     const pos = getInputPosition(e, canvas);
     
-    // Verificar colisión con paredes
-    if (checkWallCollision(pos.x, pos.y)) {
-        // Chocó con una pared
-        failed = true;
-        isDrawing = false;
-        
-        // Reiniciar posición de la uva
-        setTimeout(() => {
-            grapeX = mazeStartX + 25;
-            grapeY = mazeStartY + 25;
-            failed = false;
-        }, 500);
-        return;
-    }
+    // Mover la letra U (sin restricciones de paredes)
+    letterUX = pos.x;
+    letterUY = pos.y;
     
-    // Mover la uva
-    grapeX = pos.x;
-    grapeY = pos.y;
-    
-    // Verificar si llegó a la meta
-    if (isNearGoal(pos.x, pos.y)) {
+    // Verificar si llegó a la uva
+    if (checkReachedGrape()) {
         completed = true;
         celebrationTimer = 0;
         isDrawing = false;
@@ -326,34 +262,24 @@ function gameLoop() {
     ctx.fillText('🍇 El Laberinto de la Uva', canvas.width / 2, 50);
     
     // Instrucciones
-    if (!completed && !failed) {
+    if (!completed) {
         ctx.font = 'bold 18px Arial';
         ctx.fillStyle = '#FFFFFF';
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 3;
-        ctx.strokeText('Arrastra la uva hasta la letra U sin tocar las paredes', canvas.width / 2, 80);
-        ctx.fillText('Arrastra la uva hasta la letra U sin tocar las paredes', canvas.width / 2, 80);
-    }
-    
-    // Mensaje de error
-    if (failed) {
-        ctx.font = 'bold 24px Arial';
-        ctx.fillStyle = '#FF5252';
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 3;
-        ctx.strokeText('¡Tocaste la pared! Intenta de nuevo', canvas.width / 2, 80);
-        ctx.fillText('¡Tocaste la pared! Intenta de nuevo', canvas.width / 2, 80);
+        ctx.strokeText('Arrastra la letra U hasta la uva', canvas.width / 2, 80);
+        ctx.fillText('Arrastra la letra U hasta la uva', canvas.width / 2, 80);
     }
     
     // Dibujar laberinto
     drawMaze();
     
-    // Dibujar meta
-    drawGoalU();
+    // Dibujar uva (meta fija)
+    drawGrape(grapeX, grapeY);
     
-    // Dibujar uva
+    // Dibujar letra U (movible)
     if (!completed) {
-        drawGrape(grapeX, grapeY);
+        drawLetterU(letterUX, letterUY);
     }
     
     // Celebración
@@ -400,8 +326,8 @@ function gameLoop() {
         if (celebrationTimer > 480) {
             completed = false;
             celebrationTimer = 0;
-            grapeX = mazeStartX + 25;
-            grapeY = mazeStartY + 25;
+            letterUX = mazeStartX + 25;
+            letterUY = mazeStartY + 25;
         }
     }
     
