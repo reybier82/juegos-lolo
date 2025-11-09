@@ -1,19 +1,449 @@
 {% extends "base.html" %}
 
-{% block title %}Letra M - Mover Animales{% endblock %}
+{% block title %}Letra M - Cosecha de Manzanas{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🐵 Letra M - Mover Animales</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🍎 Letra M - Cosecha de Manzanas</h1>
+    <p class="game-description">¡Arrastra solo las manzanas a la cesta!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let fruits = [];
+let applesCollected = 0;
+const totalApples = 5;
+let celebrating = false;
+let basketX = 400;
+const basketY = 520;
+const basketSpeed = 15;
+let keys = {};
+let spawnTimer = 0;
+const spawnInterval = 90; // Frames entre frutas (1.5 segundos)
+
+// Crear una nueva fruta cayendo
+function spawnFruit() {
+    const types = ['apple', 'apple', 'orange', 'pineapple']; // Más probabilidad de manzanas
+    const type = types[Math.floor(Math.random() * types.length)];
+    
+    fruits.push({
+        type: type,
+        x: 300 + Math.random() * 200, // Caen desde el área del árbol
+        y: 50,
+        speed: 2 + Math.random() * 1,
+        collected: false,
+        missed: false
+    });
+}
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar árbol con tronco en el suelo
+function drawTree() {
+    // Tronco desde el suelo
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(360, 200, 80, 350);
+    
+    // Textura del tronco
+    ctx.strokeStyle = '#654321';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.moveTo(370 + i * 15, 250);
+        ctx.lineTo(365 + i * 15, 500);
+        ctx.stroke();
+    }
+    
+    // Copa del árbol grande
+    ctx.fillStyle = '#228B22';
+    ctx.beginPath();
+    ctx.arc(400, 180, 180, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Hojas más oscuras para profundidad
+    ctx.fillStyle = '#1a6b1a';
+    ctx.beginPath();
+    ctx.arc(320, 150, 120, 0, Math.PI * 2);
+    ctx.arc(480, 150, 120, 0, Math.PI * 2);
+    ctx.arc(400, 100, 100, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Dibujar manzana
+function drawApple(x, y) {
+    // Manzana roja
+    ctx.fillStyle = '#FF0000';
+    ctx.beginPath();
+    ctx.arc(x, y, 25, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Brillo
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.arc(x - 8, y - 8, 10, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Tallo
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 25);
+    ctx.lineTo(x - 5, y - 35);
+    ctx.stroke();
+    
+    // Hoja
+    ctx.fillStyle = '#228B22';
+    ctx.beginPath();
+    ctx.ellipse(x - 8, y - 35, 8, 5, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Dibujar naranja
+function drawOrange(x, y) {
+    // Naranja
+    ctx.fillStyle = '#FFA500';
+    ctx.beginPath();
+    ctx.arc(x, y, 25, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Textura
+    ctx.strokeStyle = '#FF8C00';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) {
+        const angle = (i * Math.PI) / 4;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(angle) * 25, y + Math.sin(angle) * 25);
+        ctx.stroke();
+    }
+    
+    // Brillo
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.beginPath();
+    ctx.arc(x - 8, y - 8, 8, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Dibujar piña
+function drawPineapple(x, y) {
+    // Cuerpo de la piña
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 20, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Patrón de diamantes
+    ctx.strokeStyle = '#DAA520';
+    ctx.lineWidth = 2;
+    for (let i = -20; i < 20; i += 10) {
+        ctx.beginPath();
+        ctx.moveTo(x - 15, y + i);
+        ctx.lineTo(x + 15, y + i);
+        ctx.stroke();
+    }
+    for (let i = -10; i < 10; i += 10) {
+        ctx.beginPath();
+        ctx.moveTo(x + i, y - 25);
+        ctx.lineTo(x + i, y + 25);
+        ctx.stroke();
+    }
+    
+    // Hojas superiores
+    ctx.fillStyle = '#228B22';
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 30);
+        ctx.lineTo(x - 10 + i * 5, y - 45);
+        ctx.lineTo(x - 5 + i * 5, y - 30);
+        ctx.fill();
+    }
+}
+
+// Dibujar cesta
+function drawBasket() {
+    const glowing = applesCollected === totalApples;
+    
+    if (glowing) {
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 20;
+    }
+    
+    // Cesta
+    ctx.fillStyle = '#D2691E';
+    ctx.beginPath();
+    ctx.moveTo(basketX - 60, basketY);
+    ctx.lineTo(basketX - 50, basketY + 50);
+    ctx.lineTo(basketX + 50, basketY + 50);
+    ctx.lineTo(basketX + 60, basketY);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Trama de la cesta
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 2;
+    for (let i = -50; i < 50; i += 10) {
+        ctx.beginPath();
+        ctx.moveTo(basketX + i, basketY);
+        ctx.lineTo(basketX + i - 5, basketY + 50);
+        ctx.stroke();
+    }
+    
+    // Asa
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(basketX, basketY - 10, 40, 0, Math.PI, true);
+    ctx.stroke();
+    
+    ctx.shadowBlur = 0;
+}
+
+// Dibujar suelo
+function drawGround() {
+    ctx.fillStyle = '#90EE90';
+    ctx.fillRect(0, 550, canvas.width, 50);
+    
+    // Pasto
+    ctx.strokeStyle = '#228B22';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < canvas.width; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(i, 550);
+        ctx.lineTo(i + 10, 560);
+        ctx.stroke();
+    }
+}
+
+// Manejo de eventos - Mover cesta con teclado y touch
+window.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+});
+
+// Touch para mover la cesta
+let touchStartX = null;
+
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (celebrating) return;
+    const pos = getInputPosition(e, canvas);
+    touchStartX = pos.x;
+});
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (celebrating || touchStartX === null) return;
+    const pos = getInputPosition(e, canvas);
+    basketX = pos.x;
+    basketX = Math.max(60, Math.min(canvas.width - 60, basketX));
+});
+
+canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    touchStartX = null;
+});
+
+// Mouse para mover la cesta
+canvas.addEventListener('mousemove', (e) => {
+    if (celebrating) return;
+    const pos = getInputPosition(e, canvas);
+    basketX = pos.x;
+    basketX = Math.max(60, Math.min(canvas.width - 60, basketX));
+});
+
+// Actualizar posición de la cesta con teclado
+function updateBasket() {
+    if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+        basketX -= basketSpeed;
+    }
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+        basketX += basketSpeed;
+    }
+    
+    // Limitar la cesta dentro del canvas
+    basketX = Math.max(60, Math.min(canvas.width - 60, basketX));
+}
+
+// Mostrar celebración
+function showCelebration() {
+    console.log('🎉 ¡Todas las manzanas recogidas!');
+}
+
+// Reiniciar juego
+function resetGame() {
+    fruits = [];
+    applesCollected = 0;
+    celebrating = false;
+    spawnTimer = 0;
+}
+
+// Loop del juego
+function gameLoop() {
+    // Fondo (cielo)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#87CEEB');
+    gradient.addColorStop(1, '#E0F6FF');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    if (!celebrating) {
+        // Actualizar cesta
+        updateBasket();
+        
+        // Generar nuevas frutas
+        spawnTimer++;
+        if (spawnTimer >= spawnInterval) {
+            spawnFruit();
+            spawnTimer = 0;
+        }
+        
+        // Actualizar frutas (caída)
+        fruits.forEach(fruit => {
+            if (!fruit.collected && !fruit.missed) {
+                fruit.y += fruit.speed;
+                
+                // Verificar colisión con la cesta (solo manzanas)
+                if (fruit.type === 'apple' && fruit.y >= basketY - 20 && fruit.y <= basketY + 20) {
+                    if (Math.abs(fruit.x - basketX) < 60) {
+                        fruit.collected = true;
+                        applesCollected++;
+                        
+                        if (applesCollected >= totalApples) {
+                            celebrating = true;
+                            setTimeout(() => {
+                                showCelebration();
+                            }, 500);
+                        }
+                    }
+                }
+                
+                // Marcar como perdida si pasa la cesta
+                if (fruit.y > canvas.height) {
+                    fruit.missed = true;
+                }
+            }
+        });
+        
+        // Limpiar frutas viejas
+        fruits = fruits.filter(f => !f.missed && !f.collected);
+    }
+    
+    // Dibujar elementos
+    drawGround();
+    drawTree();
+    
+    // Dibujar frutas cayendo
+    fruits.forEach(fruit => {
+        if (!fruit.collected && !fruit.missed) {
+            if (fruit.type === 'apple') {
+                drawApple(fruit.x, fruit.y);
+            } else if (fruit.type === 'orange') {
+                drawOrange(fruit.x, fruit.y);
+            } else if (fruit.type === 'pineapple') {
+                drawPineapple(fruit.x, fruit.y);
+            }
+        }
+    });
+    
+    drawBasket();
+    
+    // Instrucciones
+    if (applesCollected === 0 && !celebrating) {
+        ctx.font = 'bold 26px Arial';
+        ctx.fillStyle = '#1565C0';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 5;
+        ctx.textAlign = 'center';
+        ctx.strokeText('🍎 ¡Mueve la cesta para atrapar las MANZANAS!', canvas.width / 2, 40);
+        ctx.fillText('🍎 ¡Mueve la cesta para atrapar las MANZANAS!', canvas.width / 2, 40);
+    }
+    
+    // Contador
+    if (!celebrating) {
+        ctx.font = 'bold 22px Arial';
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Manzanas: ${applesCollected}/${totalApples}`, 20, 40);
+    }
+    
+    // Celebración
+    if (celebrating) {
+        // Fondo semi-transparente
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Mensaje
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        
+        ctx.font = 'bold 30px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.strokeText('¡Recogiste todas las manzanas!', canvas.width / 2, canvas.height / 2 + 40);
+        ctx.fillText('¡Recogiste todas las manzanas!', canvas.width / 2, canvas.height / 2 + 40);
+        
+        // Reiniciar después de 3 segundos
+        if (!resetGame.scheduled) {
+            resetGame.scheduled = true;
+            setTimeout(() => {
+                resetGame();
+                resetGame.scheduled = false;
+            }, 3000);
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}
