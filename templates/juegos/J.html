@@ -1,19 +1,388 @@
 {% extends "base.html" %}
 
-{% block title %}Letra J - Jabón y Burbujas{% endblock %}
+{% block title %}Letra J - Lavar y Alimentar la Jirafa{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🫧 Letra J - Jabón y Burbujas</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🦒 Letra J - Lavar y Alimentar la Jirafa</h1>
+    <p class="game-description">¡Lava a la jirafa con jabón y luego aliméntala!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+const giraffeX = 400;
+const giraffeY = 480; // En el suelo
+let gamePhase = 'washing'; // 'washing', 'showWord', 'feeding', 'complete'
+let cleanProgress = 0;
+let isDraggingSoap = false;
+let soapX = 100;
+let soapY = 480;
+let bucketX = 100; // Posición del tobo
+let bucketY = 500;
+let showingWord = false;
+let wordTimer = 0;
+let giraffeSize = 1;
+let foodEaten = { jamon: false, jojoto: false, jugo: false };
+let draggingFood = null;
+let foodPositions = {
+    jamon: { x: 150, y: 450 },
+    jojoto: { x: 400, y: 450 },
+    jugo: { x: 650, y: 450 }
+};
+
+// Cargar imágenes
+const giraffeImg = new Image();
+const jamonImg = new Image();
+const jugoImg = new Image();
+const jojotoImg = new Image();
+const jabonImg = new Image();
+let imagesLoaded = 0;
+const totalImages = 5;
+
+giraffeImg.src = '/assets/img/jirafa.png';
+jamonImg.src = '/assets/img/jamon.png';
+jugoImg.src = '/assets/img/jugo.png';
+jojotoImg.src = '/assets/img/jojoto.avif';
+jabonImg.src = '/assets/img/jabon.png';
+
+function imageLoaded() {
+    imagesLoaded++;
+    if (imagesLoaded === totalImages) {
+        console.log('Todas las imágenes cargadas');
+    }
+}
+
+giraffeImg.onload = imageLoaded;
+jamonImg.onload = imageLoaded;
+jugoImg.onload = imageLoaded;
+jojotoImg.onload = imageLoaded;
+jabonImg.onload = imageLoaded;
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar jirafa
+function drawGiraffe(dirty) {
+    if (!giraffeImg.complete) return;
+    
+    ctx.save();
+    ctx.translate(giraffeX, giraffeY);
+    ctx.scale(giraffeSize, giraffeSize);
+    
+    // Dibujar la imagen de la jirafa centrada y en el suelo
+    const imgWidth = 220;
+    const imgHeight = 320;
+    ctx.drawImage(giraffeImg, -imgWidth/2, -imgHeight + 50, imgWidth, imgHeight);
+    
+    // Manchitas negras de suciedad si está sucia
+    if (dirty && cleanProgress < 1) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.8 * (1 - cleanProgress)})`;
+        ctx.beginPath();
+        // Manchas en diferentes partes de la jirafa
+        ctx.arc(-45, -200, 16, 0, Math.PI * 2);
+        ctx.arc(35, -180, 18, 0, Math.PI * 2);
+        ctx.arc(-25, -140, 20, 0, Math.PI * 2);
+        ctx.arc(40, -110, 16, 0, Math.PI * 2);
+        ctx.arc(-50, -70, 14, 0, Math.PI * 2);
+        ctx.arc(20, -40, 22, 0, Math.PI * 2);
+        ctx.arc(-35, 0, 18, 0, Math.PI * 2);
+        ctx.arc(45, 20, 16, 0, Math.PI * 2);
+        ctx.arc(-15, 35, 14, 0, Math.PI * 2);
+        ctx.arc(25, 45, 12, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    ctx.restore();
+}
+
+// Dibujar jabón
+function drawBucket() {
+    if (!jabonImg.complete) return;
+    
+    // Dibujar imagen del jabón aún más grande
+    ctx.drawImage(jabonImg, soapX - 60, soapY - 60, 120, 120);
+}
+
+// Dibujar comida (sin fondos, solo las imágenes)
+function drawFood() {
+    // Jamón
+    if (!foodEaten.jamon && jamonImg.complete) {
+        const jx = foodPositions.jamon.x;
+        const jy = foodPositions.jamon.y;
+        ctx.drawImage(jamonImg, jx - 50, jy - 50, 100, 100);
+        ctx.font = 'bold 18px Arial';
+        ctx.fillStyle = '#000';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.strokeText('JAMÓN', jx, jy + 70);
+        ctx.fillText('JAMÓN', jx, jy + 70);
+    }
+    
+    // Jojoto (mazorca)
+    if (!foodEaten.jojoto && jojotoImg.complete) {
+        const mx = foodPositions.jojoto.x;
+        const my = foodPositions.jojoto.y;
+        ctx.drawImage(jojotoImg, mx - 50, my - 50, 100, 100);
+        ctx.font = 'bold 18px Arial';
+        ctx.fillStyle = '#000';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.strokeText('JOJOTO', mx, my + 70);
+        ctx.fillText('JOJOTO', mx, my + 70);
+    }
+    
+    // Jugo
+    if (!foodEaten.jugo && jugoImg.complete) {
+        const jux = foodPositions.jugo.x;
+        const juy = foodPositions.jugo.y;
+        ctx.drawImage(jugoImg, jux - 50, juy - 50, 100, 100);
+        ctx.font = 'bold 18px Arial';
+        ctx.fillStyle = '#000';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        ctx.strokeText('JUGO', jux, juy + 70);
+        ctx.fillText('JUGO', jux, juy + 70);
+    }
+}
+
+// Mostrar palabra JABÓN
+function drawWordJabon() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.font = 'bold 120px Arial';
+    ctx.fillStyle = '#FFD700';
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 10;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText('JABÓN', canvas.width / 2, canvas.height / 2);
+    ctx.fillText('JABÓN', canvas.width / 2, canvas.height / 2);
+}
+
+// Manejo de eventos
+function handleStart(e) {
+    e.preventDefault();
+    const pos = getInputPosition(e, canvas);
+    
+    if (gamePhase === 'washing') {
+        // Verificar si toca el jabón (área más grande)
+        if (Math.abs(pos.x - soapX) < 60 && Math.abs(pos.y - soapY) < 60) {
+            isDraggingSoap = true;
+        }
+    } else if (gamePhase === 'feeding') {
+        // Verificar si toca alguna comida
+        for (let food in foodPositions) {
+            if (!foodEaten[food]) {
+                const fx = foodPositions[food].x;
+                const fy = foodPositions[food].y;
+                if (Math.abs(pos.x - fx) < 50 && Math.abs(pos.y - fy) < 50) {
+                    draggingFood = food;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+function handleMove(e) {
+    e.preventDefault();
+    const pos = getInputPosition(e, canvas);
+    
+    if (gamePhase === 'washing' && isDraggingSoap) {
+        soapX = pos.x;
+        soapY = pos.y;
+        
+        // Verificar si está lavando la jirafa
+        if (Math.abs(pos.x - giraffeX) < 100 && Math.abs(pos.y - giraffeY) < 150) {
+            cleanProgress += 0.01;
+            if (cleanProgress >= 1) {
+                cleanProgress = 1;
+                gamePhase = 'showWord';
+                showingWord = true;
+                wordTimer = 0;
+            }
+        }
+    } else if (gamePhase === 'feeding' && draggingFood) {
+        foodPositions[draggingFood].x = pos.x;
+        foodPositions[draggingFood].y = pos.y;
+        
+        // Verificar si está alimentando la jirafa
+        if (Math.abs(pos.x - giraffeX) < 80 && Math.abs(pos.y - (giraffeY - 80)) < 60) {
+            foodEaten[draggingFood] = true;
+            draggingFood = null;
+            giraffeSize += 0.08; // Crece un poco (menos que antes)
+            
+            // Verificar si comió todo
+            if (foodEaten.jamon && foodEaten.jojoto && foodEaten.jugo) {
+                gamePhase = 'complete';
+                setTimeout(() => {
+                    resetGame();
+                }, 3000);
+            }
+        }
+    }
+}
+
+function handleEnd(e) {
+    e.preventDefault();
+    isDraggingSoap = false;
+    draggingFood = null;
+}
+
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mousemove', handleMove);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('touchstart', handleStart);
+canvas.addEventListener('touchmove', handleMove);
+canvas.addEventListener('touchend', handleEnd);
+
+// Reiniciar juego
+function resetGame() {
+    gamePhase = 'washing';
+    cleanProgress = 0;
+    isDraggingSoap = false;
+    soapX = 100;
+    soapY = 480;
+    bucketX = 100;
+    bucketY = 500;
+    showingWord = false;
+    wordTimer = 0;
+    giraffeSize = 1;
+    foodEaten = { jamon: false, jojoto: false, jugo: false };
+    draggingFood = null;
+    foodPositions = {
+        jamon: { x: 150, y: 450 },
+        jojoto: { x: 400, y: 450 },
+        jugo: { x: 650, y: 450 }
+    };
+}
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#87CEEB');
+    gradient.addColorStop(1, '#E0F6FF');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Suelo
+    ctx.fillStyle = '#90EE90';
+    ctx.fillRect(0, 550, canvas.width, 50);
+    
+    if (gamePhase === 'washing') {
+        drawGiraffe(true);
+        drawBucket();
+        
+        // Instrucciones
+        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = '#1565C0';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 5;
+        ctx.textAlign = 'center';
+        ctx.strokeText('🧼 ¡Arrastra el jabón para lavar la jirafa!', canvas.width / 2, 40);
+        ctx.fillText('🧼 ¡Arrastra el jabón para lavar la jirafa!', canvas.width / 2, 40);
+        
+        // Barra de progreso
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(250, 70, 300, 25);
+        ctx.fillStyle = '#4CAF50';
+        ctx.fillRect(250, 70, 300 * cleanProgress, 25);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(250, 70, 300, 25);
+        
+    } else if (gamePhase === 'showWord') {
+        drawGiraffe(false);
+        drawWordJabon();
+        
+        wordTimer++;
+        if (wordTimer > 120) { // 2 segundos
+            gamePhase = 'feeding';
+        }
+        
+    } else if (gamePhase === 'feeding') {
+        drawGiraffe(false);
+        drawFood();
+        
+        // Instrucciones
+        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = '#1565C0';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 5;
+        ctx.textAlign = 'center';
+        ctx.strokeText('🍖 ¡Arrastra la comida a la jirafa!', canvas.width / 2, 40);
+        ctx.fillText('🍖 ¡Arrastra la comida a la jirafa!', canvas.width / 2, 40);
+        
+    } else if (gamePhase === 'complete') {
+        drawGiraffe(false);
+        
+        // Celebración
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        
+        ctx.font = 'bold 30px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.strokeText('¡La jirafa está limpia y alimentada!', canvas.width / 2, canvas.height / 2 + 40);
+        ctx.fillText('¡La jirafa está limpia y alimentada!', canvas.width / 2, canvas.height / 2 + 40);
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}

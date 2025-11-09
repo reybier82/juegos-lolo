@@ -1,19 +1,379 @@
 {% extends "base.html" %}
 
-{% block title %}Letra K - Karaoke{% endblock %}
+{% block title %}Letra K - Sube al Koala{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🎤 Letra K - Karaoke</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🐨 Letra K - Sube al Koala</h1>
+    <p class="game-description">¡Toca la K cuando se ilumine para ayudar al koala a subir!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Variables del juego
+let koalaY = 480; // Posición Y del koala (empieza abajo del árbol)
+const koalaX = 600; // Posición X del koala (en el árbol)
+const treeX = 600; // Posición X del árbol
+const targetY = 180; // Posición objetivo (arriba del árbol)
+let isLit = false; // Si la K está iluminada
+let canTap = false; // Si se puede tocar
+let score = 0; // Puntuación (toques correctos)
+let maxScore = 10; // Toques necesarios para llegar arriba
+let celebrating = false;
+let litTimer = 0;
+let darkTimer = 0;
+const litDuration = 60; // Frames que dura iluminada (1 segundo)
+const darkDuration = 60; // Frames que dura apagada (1 segundo)
+let koalaHugging = false;
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar la letra K en el suelo
+function drawLetterK() {
+    const kColor = isLit ? '#FFD700' : '#FFA500'; // Dorado brillante cuando iluminada, naranja normal
+    
+    ctx.save();
+    
+    // Efecto de brillo si está iluminada
+    if (isLit) {
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 40;
+    }
+    
+    ctx.fillStyle = kColor;
+    ctx.strokeStyle = kColor;
+    ctx.lineWidth = 40;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    // Dibujar la K grande en el suelo
+    const kX = 250;
+    const kY = 400;
+    const kHeight = 150;
+    
+    // Línea vertical
+    ctx.beginPath();
+    ctx.moveTo(kX, kY);
+    ctx.lineTo(kX, kY + kHeight);
+    ctx.stroke();
+    
+    // Línea diagonal superior
+    ctx.beginPath();
+    ctx.moveTo(kX, kY + kHeight / 2);
+    ctx.lineTo(kX + 80, kY);
+    ctx.stroke();
+    
+    // Línea diagonal inferior
+    ctx.beginPath();
+    ctx.moveTo(kX, kY + kHeight / 2);
+    ctx.lineTo(kX + 80, kY + kHeight);
+    ctx.stroke();
+    
+    ctx.restore();
+}
+
+// Dibujar el árbol normal
+function drawTree() {
+    // Tronco
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(treeX - 25, 300, 50, 250);
+    
+    // Copa del árbol (3 círculos verdes)
+    ctx.fillStyle = '#228B22';
+    ctx.beginPath();
+    ctx.arc(treeX, 250, 60, 0, Math.PI * 2);
+    ctx.arc(treeX - 50, 280, 50, 0, Math.PI * 2);
+    ctx.arc(treeX + 50, 280, 50, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Hojas más oscuras para profundidad
+    ctx.fillStyle = '#1a6b1a';
+    ctx.beginPath();
+    ctx.arc(treeX - 20, 240, 35, 0, Math.PI * 2);
+    ctx.arc(treeX + 20, 260, 30, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Dibujar el koala
+function drawKoala() {
+    ctx.save();
+    ctx.translate(koalaX, koalaY);
+    
+    // El koala siempre está en el árbol, no necesita moverse horizontalmente
+    if (koalaHugging) {
+        // Koala abrazando el árbol en la cima
+        ctx.rotate(-Math.PI / 8);
+    }
+    
+    // Cuerpo
+    ctx.fillStyle = '#A9A9A9';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 35, 45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Barriga blanca
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 25, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Cabeza
+    ctx.fillStyle = '#A9A9A9';
+    ctx.beginPath();
+    ctx.arc(0, -35, 30, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Orejas grandes y peludas
+    ctx.fillStyle = '#A9A9A9';
+    ctx.beginPath();
+    ctx.arc(-25, -50, 18, 0, Math.PI * 2);
+    ctx.arc(25, -50, 18, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Interior de orejas
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-25, -50, 10, 0, Math.PI * 2);
+    ctx.arc(25, -50, 10, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Nariz grande
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.ellipse(0, -25, 12, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Ojos
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(-10, -35, 4, 0, Math.PI * 2);
+    ctx.arc(10, -35, 4, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Brillo en los ojos
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-9, -36, 2, 0, Math.PI * 2);
+    ctx.arc(11, -36, 2, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Brazos
+    ctx.fillStyle = '#A9A9A9';
+    ctx.beginPath();
+    ctx.ellipse(-30, -5, 12, 25, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(30, -5, 12, 25, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Piernas
+    ctx.beginPath();
+    ctx.ellipse(-15, 35, 15, 20, 0, 0, Math.PI * 2);
+    ctx.ellipse(15, 35, 15, 20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+// Dibujar suelo
+function drawGround() {
+    ctx.fillStyle = '#90EE90';
+    ctx.fillRect(0, 550, canvas.width, 50);
+    
+    // Pasto
+    ctx.strokeStyle = '#228B22';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < canvas.width; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(i, 550);
+        ctx.lineTo(i + 10, 560);
+        ctx.stroke();
+    }
+}
+
+// Manejo de eventos
+function handleTap(e) {
+    e.preventDefault();
+    if (celebrating || koalaHugging) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    // Verificar si tocó la letra K
+    const distanceToK = Math.abs(pos.x - 250);
+    const inKArea = distanceToK < 100 && pos.y > 380 && pos.y < 560;
+    
+    if (inKArea && isLit && canTap) {
+        // Toque correcto
+        score++;
+        canTap = false;
+        
+        // Subir el koala por el árbol
+        const stepY = (480 - targetY) / maxScore;
+        koalaY -= stepY;
+        
+        // Verificar si llegó arriba
+        if (score >= maxScore) {
+            koalaHugging = true;
+            celebrating = true;
+            setTimeout(() => {
+                showCelebration();
+            }, 1000);
+        }
+    } else if (inKArea && !isLit) {
+        // Toque incorrecto (cuando no está iluminada)
+        // Pequeña penalización: bajar un poco
+        if (koalaY < 480) {
+            koalaY += 10;
+            if (koalaY > 480) koalaY = 480;
+        }
+    }
+}
+
+canvas.addEventListener('click', handleTap);
+canvas.addEventListener('touchstart', handleTap);
+
+// Mostrar celebración
+function showCelebration() {
+    console.log('�� ¡El koala llegó arriba!');
+}
+
+// Reiniciar juego
+function resetGame() {
+    koalaY = 480;
+    isLit = false;
+    canTap = false;
+    score = 0;
+    celebrating = false;
+    litTimer = 0;
+    darkTimer = 0;
+    koalaHugging = false;
+}
+
+// Loop del juego
+function gameLoop() {
+    // Fondo (cielo)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#87CEEB');
+    gradient.addColorStop(1, '#E0F6FF');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Dibujar elementos
+    drawGround();
+    drawTree();
+    drawLetterK();
+    drawKoala();
+    
+    // Lógica de iluminación (solo si no está celebrando)
+    if (!celebrating) {
+        if (isLit) {
+            litTimer++;
+            if (litTimer >= litDuration) {
+                isLit = false;
+                canTap = false;
+                litTimer = 0;
+            }
+        } else {
+            darkTimer++;
+            if (darkTimer >= darkDuration) {
+                isLit = true;
+                canTap = true;
+                darkTimer = 0;
+            }
+        }
+    }
+    
+    // Instrucciones
+    if (score === 0 && !celebrating) {
+        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = '#1565C0';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 5;
+        ctx.textAlign = 'center';
+        ctx.strokeText('🐨 ¡Toca la K cuando se ilumine!', canvas.width / 2, 40);
+        ctx.fillText('🐨 ¡Toca la K cuando se ilumine!', canvas.width / 2, 40);
+    }
+    
+    // Mostrar progreso
+    if (!celebrating) {
+        ctx.font = 'bold 20px Arial';
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Progreso: ${score}/${maxScore}`, 20, 40);
+    }
+    
+    // Celebración
+    if (celebrating) {
+        // Fondo semi-transparente
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Mensaje
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText('¡EXCELENTE!', canvas.width / 2, canvas.height / 2 - 20);
+        
+        ctx.font = 'bold 30px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.strokeText('¡El koala llegó a la cima!', canvas.width / 2, canvas.height / 2 + 40);
+        ctx.fillText('¡El koala llegó a la cima!', canvas.width / 2, canvas.height / 2 + 40);
+        
+        // Reiniciar después de 3 segundos
+        if (!resetGame.scheduled) {
+            resetGame.scheduled = true;
+            setTimeout(() => {
+                resetGame();
+                resetGame.scheduled = false;
+            }, 3000);
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}
