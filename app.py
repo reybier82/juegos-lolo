@@ -23,7 +23,7 @@ JUEGOS = {
     'G': {'nombre': 'El Ovillo del Gato', 'descripcion': 'Traza el camino para que el gato llegue al ovillo'},
     'H': {'nombre': '¡Enciende la Hélice!', 'descripcion': 'Gira la hélice para hacer volar el helicóptero'},
     'I': {'nombre': 'Colorear la Isla', 'descripcion': 'Colorea todos los elementos de la isla'},
-    'J': {'nombre': 'Lavar y Alimentar la Jirafa', 'descripcion': 'Lava a la jirafa con jabón y luego aliméntala'},
+    'J': {'nombre': 'Alimentar la Jirafa', 'descripcion': 'Arrastra la comida para alimentar a la jirafa'},
     'K': {'nombre': 'Sube al Koala', 'descripcion': 'Toca la K cuando se ilumine para ayudar al koala a subir'},
     'L': {'nombre': 'Enciende la Luna', 'descripcion': 'Frota la pantalla para limpiar las nubes y ver la luna'},
     'M': {'nombre': 'Cosecha de Manzanas', 'descripcion': 'Arrastra solo las manzanas a la cesta'},
