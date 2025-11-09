@@ -32,10 +32,11 @@ window.addEventListener('resize', resizeCanvas);
 
 // Variables del juego
 let gameState = 'playing'; // 'playing', 'celebrating'
-let birdX = 400;
-let birdY = 100;
-let birdAngle = 0;
-let birdSpeed = 2;
+let birdX = 100;
+let birdY = 150;
+let birdDirection = 1; // 1 = derecha, -1 = izquierda
+let birdSpeed = 3;
+let birdBobbing = 0; // Para movimiento vertical suave
 let celebrating = false;
 let celebrationTimer = 0;
 
@@ -160,10 +161,14 @@ function drawNest(x, y, letter, isCorrect, isClicked) {
 }
 
 // Dibujar pajarito
-function drawBird(x, y, angle) {
+function drawBird(x, y, facingRight) {
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(angle);
+    
+    // Voltear horizontalmente si va a la izquierda
+    if (!facingRight) {
+        ctx.scale(-1, 1);
+    }
     
     // Cuerpo del pájaro
     ctx.fillStyle = '#FFD700';
@@ -171,24 +176,24 @@ function drawBird(x, y, angle) {
     ctx.ellipse(0, 0, 20, 15, 0, 0, Math.PI * 2);
     ctx.fill();
     
-    // Cabeza
+    // Cabeza (adelante)
     ctx.fillStyle = '#FFA500';
     ctx.beginPath();
-    ctx.arc(-15, -5, 12, 0, Math.PI * 2);
+    ctx.arc(15, -5, 12, 0, Math.PI * 2);
     ctx.fill();
     
     // Ojo
     ctx.fillStyle = '#000000';
     ctx.beginPath();
-    ctx.arc(-18, -7, 3, 0, Math.PI * 2);
+    ctx.arc(18, -7, 3, 0, Math.PI * 2);
     ctx.fill();
     
-    // Pico
+    // Pico (apuntando adelante)
     ctx.fillStyle = '#FF6347';
     ctx.beginPath();
-    ctx.moveTo(-25, -5);
-    ctx.lineTo(-30, -3);
-    ctx.lineTo(-25, -1);
+    ctx.moveTo(25, -5);
+    ctx.lineTo(30, -3);
+    ctx.lineTo(25, -1);
     ctx.closePath();
     ctx.fill();
     
@@ -196,28 +201,28 @@ function drawBird(x, y, angle) {
     const wingAngle = Math.sin(Date.now() / 100) * 0.3;
     ctx.fillStyle = '#FFA500';
     
-    // Ala izquierda
+    // Ala superior
     ctx.save();
     ctx.rotate(wingAngle);
     ctx.beginPath();
-    ctx.ellipse(-5, -10, 15, 8, -0.5, 0, Math.PI * 2);
+    ctx.ellipse(5, -10, 15, 8, -0.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     
-    // Ala derecha
+    // Ala inferior
     ctx.save();
     ctx.rotate(-wingAngle);
     ctx.beginPath();
-    ctx.ellipse(-5, 10, 15, 8, 0.5, 0, Math.PI * 2);
+    ctx.ellipse(5, 10, 15, 8, 0.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     
-    // Cola
+    // Cola (atrás)
     ctx.fillStyle = '#FF8C00';
     ctx.beginPath();
-    ctx.moveTo(20, 0);
-    ctx.lineTo(30, -8);
-    ctx.lineTo(30, 8);
+    ctx.moveTo(-20, 0);
+    ctx.lineTo(-30, -8);
+    ctx.lineTo(-30, 8);
     ctx.closePath();
     ctx.fill();
     
@@ -296,11 +301,23 @@ function gameLoop() {
     
     // Animar pajarito
     if (!celebrating) {
-        // Volar en círculo confundido
-        birdAngle += 0.02;
-        birdX = 400 + Math.cos(birdAngle) * 150;
-        birdY = 200 + Math.sin(birdAngle) * 80;
-        drawBird(birdX, birdY, birdAngle + Math.PI / 2);
+        // Volar de izquierda a derecha
+        birdX += birdSpeed * birdDirection;
+        
+        // Cambiar dirección al llegar a los bordes
+        if (birdX > canvas.width - 50) {
+            birdDirection = -1;
+        } else if (birdX < 50) {
+            birdDirection = 1;
+        }
+        
+        // Movimiento vertical suave (bobbing)
+        birdBobbing += 0.05;
+        const bobbingOffset = Math.sin(birdBobbing) * 15;
+        
+        // Dibujar pajarito mirando en la dirección correcta
+        const facingRight = birdDirection === 1;
+        drawBird(birdX, birdY + bobbingOffset, facingRight);
         
         // Instrucciones
         ctx.font = 'bold 26px Arial';
@@ -323,11 +340,12 @@ function gameLoop() {
         if (distance > 5) {
             birdX += (dx / distance) * 4;
             birdY += (dy / distance) * 4;
-            const angle = Math.atan2(dy, dx);
-            drawBird(birdX, birdY, angle);
+            // Determinar dirección según si va hacia la derecha o izquierda
+            const facingRight = dx > 0;
+            drawBird(birdX, birdY, facingRight);
         } else {
-            // Pajarito en el nido
-            drawBird(targetX, targetY, 0);
+            // Pajarito en el nido (mirando a la derecha)
+            drawBird(targetX, targetY, true);
             
             celebrationTimer++;
             
@@ -354,7 +372,10 @@ function gameLoop() {
             if (celebrationTimer > 180) {
                 celebrating = false;
                 celebrationTimer = 0;
-                birdAngle = 0;
+                birdX = 100;
+                birdY = 150;
+                birdDirection = 1;
+                birdBobbing = 0;
                 trees.forEach(t => t.clicked = false);
             }
         }
