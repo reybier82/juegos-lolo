@@ -29,7 +29,7 @@ JUEGOS = {
     'M': {'nombre': 'Cosecha de Manzanas', 'descripcion': 'Arrastra solo las manzanas a la cesta'},
     'N': {'nombre': 'El Nido', 'descripcion': 'Ayuda al pajarito a encontrar su nido con la letra N'},
     'O': {'nombre': 'El Oso Dormilón', 'descripcion': 'Di "OOOO" para despertar al oso'},
-    'P': {'nombre': 'Pintar', 'descripcion': 'Pinta la letra P con tus dedos'},
+    'P': {'nombre': 'Juego de Memoria', 'descripcion': 'Encuentra los pares de la letra P'},
     'Q': {'nombre': 'Queso para Ratón', 'descripcion': 'Arrastra el queso al ratón'},
     'R': {'nombre': 'Rompecabezas', 'descripcion': 'Arma el rompecabezas de la R'},
     'S': {'nombre': 'Sonidos', 'descripcion': 'Escucha sonidos de animales con S'},

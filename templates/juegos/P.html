@@ -1,19 +1,307 @@
 {% extends "base.html" %}
 
-{% block title %}Letra P - Pintar{% endblock %}
+{% block title %}Letra P - Memoria{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🎨 Letra P - Pintar</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🧠 Letra P - Juego de Memoria</h1>
+    <p class="game-description">¡Encuentra los pares de la letra P!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Cargar imágenes
+const pMayusculaImg = new Image();
+const pMinusculaImg = new Image();
+const pezImg = new Image();
+
+pMayusculaImg.src = '/assets/img/p_mayuscula.png';
+pMinusculaImg.src = '/assets/img/p_minuscula.png';
+pezImg.src = '/assets/img/pez_p.jpg';
+
+// Variables del juego
+let cards = [];
+let flippedCards = [];
+let matchedPairs = 0;
+let canFlip = true;
+let celebrating = false;
+let celebrationTimer = 0;
+
+// Crear las cartas (3 pares = 6 cartas)
+function initializeCards() {
+    const cardTypes = [
+        { type: 'mayuscula', img: pMayusculaImg },
+        { type: 'mayuscula', img: pMayusculaImg },
+        { type: 'minuscula', img: pMinusculaImg },
+        { type: 'minuscula', img: pMinusculaImg },
+        { type: 'pez', img: pezImg },
+        { type: 'pez', img: pezImg }
+    ];
+    
+    // Mezclar las cartas
+    for (let i = cardTypes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cardTypes[i], cardTypes[j]] = [cardTypes[j], cardTypes[i]];
+    }
+    
+    // Crear objetos de cartas con posiciones
+    cards = [];
+    const cardWidth = 120;
+    const cardHeight = 160;
+    const spacing = 20;
+    const startX = (canvas.width - (3 * cardWidth + 2 * spacing)) / 2;
+    const startY = 180;
+    
+    for (let i = 0; i < 6; i++) {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
+        
+        cards.push({
+            type: cardTypes[i].type,
+            img: cardTypes[i].img,
+            x: startX + col * (cardWidth + spacing),
+            y: startY + row * (cardHeight + spacing),
+            width: cardWidth,
+            height: cardHeight,
+            flipped: false,
+            matched: false
+        });
+    }
+}
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Dibujar carta
+function drawCard(card) {
+    // Sombra
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.fillRect(card.x + 5, card.y + 5, card.width, card.height);
+    
+    if (card.flipped || card.matched) {
+        // Mostrar imagen
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(card.x, card.y, card.width, card.height);
+        
+        // Borde
+        ctx.strokeStyle = card.matched ? '#4CAF50' : '#667eea';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(card.x, card.y, card.width, card.height);
+        
+        // Dibujar imagen si está cargada
+        if (card.img.complete) {
+            ctx.drawImage(card.img, card.x + 10, card.y + 10, card.width - 20, card.height - 20);
+        }
+        
+        // Brillo si está emparejada
+        if (card.matched) {
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(card.x - 3, card.y - 3, card.width + 6, card.height + 6);
+        }
+    } else {
+        // Carta volteada (dorso)
+        const gradient = ctx.createLinearGradient(card.x, card.y, card.x + card.width, card.y + card.height);
+        gradient.addColorStop(0, '#667eea');
+        gradient.addColorStop(1, '#764ba2');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(card.x, card.y, card.width, card.height);
+        
+        // Borde
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(card.x, card.y, card.width, card.height);
+        
+        // Letra P en el dorso
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('P', card.x + card.width / 2, card.y + card.height / 2);
+        
+        // Patrón decorativo
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+            ctx.strokeRect(card.x + 10 + i * 5, card.y + 10 + i * 5, 
+                          card.width - 20 - i * 10, card.height - 20 - i * 10);
+        }
+    }
+}
+
+// Manejar clic en carta
+function handleCardClick(e) {
+    e.preventDefault();
+    
+    if (!canFlip || celebrating) return;
+    
+    const pos = getInputPosition(e, canvas);
+    
+    // Verificar qué carta se tocó
+    for (let card of cards) {
+        if (pos.x >= card.x && pos.x <= card.x + card.width &&
+            pos.y >= card.y && pos.y <= card.y + card.height) {
+            
+            // No hacer nada si ya está volteada o emparejada
+            if (card.flipped || card.matched) return;
+            
+            // Voltear la carta
+            card.flipped = true;
+            flippedCards.push(card);
+            
+            // Si hay 2 cartas volteadas, verificar si coinciden
+            if (flippedCards.length === 2) {
+                canFlip = false;
+                
+                setTimeout(() => {
+                    const [card1, card2] = flippedCards;
+                    
+                    if (card1.type === card2.type) {
+                        // ¡Par encontrado!
+                        card1.matched = true;
+                        card2.matched = true;
+                        matchedPairs++;
+                        
+                        // Verificar si ganó
+                        if (matchedPairs === 3) {
+                            celebrating = true;
+                            celebrationTimer = 0;
+                        }
+                    } else {
+                        // No coinciden, voltear de nuevo
+                        card1.flipped = false;
+                        card2.flipped = false;
+                    }
+                    
+                    flippedCards = [];
+                    canFlip = true;
+                }, 1000);
+            }
+            
+            break;
+        }
+    }
+}
+
+canvas.addEventListener('click', handleCardClick);
+canvas.addEventListener('touchstart', handleCardClick);
+
+// Inicializar juego
+initializeCards();
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#f093fb');
+    gradient.addColorStop(1, '#f5576c');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Título
+    ctx.font = 'bold 40px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4;
+    ctx.textAlign = 'center';
+    ctx.strokeText('🧠 Juego de Memoria - Letra P', canvas.width / 2, 60);
+    ctx.fillText('🧠 Juego de Memoria - Letra P', canvas.width / 2, 60);
+    
+    // Contador de pares
+    ctx.font = 'bold 24px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.strokeText(`Pares encontrados: ${matchedPairs}/3`, canvas.width / 2, 120);
+    ctx.fillText(`Pares encontrados: ${matchedPairs}/3`, canvas.width / 2, 120);
+    
+    // Dibujar todas las cartas
+    cards.forEach(card => drawCard(card));
+    
+    // Celebración
+    if (celebrating) {
+        celebrationTimer++;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.font = 'bold 80px Arial';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        ctx.strokeText('¡GANASTE!', canvas.width / 2, canvas.height / 2 - 40);
+        ctx.fillText('¡GANASTE!', canvas.width / 2, canvas.height / 2 - 40);
+        
+        ctx.font = 'bold 30px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 4;
+        ctx.strokeText('¡Encontraste todos los pares!', canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('¡Encontraste todos los pares!', canvas.width / 2, canvas.height / 2 + 20);
+        
+        // Confeti
+        for (let i = 0; i < 30; i++) {
+            const x = (i * 137.5 + celebrationTimer * 2) % canvas.width;
+            const y = (i * 73.2 + celebrationTimer * 3) % canvas.height;
+            const size = 5 + (i % 3) * 3;
+            const colors = ['#FFD700', '#FF6347', '#4CAF50', '#2196F3', '#FF69B4'];
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.fillRect(x, y, size, size);
+        }
+        
+        // Reiniciar después de 4 segundos
+        if (celebrationTimer > 240) {
+            celebrating = false;
+            celebrationTimer = 0;
+            matchedPairs = 0;
+            flippedCards = [];
+            canFlip = true;
+            initializeCards();
+        }
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 {% endblock %}
