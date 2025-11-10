@@ -37,7 +37,7 @@ JUEGOS = {
     'U': {'nombre': 'El Laberinto de la Uva', 'descripcion': 'Arrastra la letra U hasta la uva a través del laberinto'},
     'V': {'nombre': 'Arma la Vaca', 'descripcion': 'Arrastra las piezas para armar el rompecabezas de la vaca'},
     'W': {'nombre': 'Waffles', 'descripcion': 'Decora waffles deliciosos'},
-    'X': {'nombre': 'Xilófono', 'descripcion': 'Toca el xilófono musical'},
+    'X': {'nombre': 'Xilófono Musical', 'descripcion': 'Toca las 8 teclas del xilófono y crea música'},
     'Y': {'nombre': 'Yo-yo', 'descripcion': 'Juega con el yo-yo'},
     'Z': {'nombre': 'Zoológico', 'descripcion': 'Descubre animales del zoológico'}
 }

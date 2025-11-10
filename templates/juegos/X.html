@@ -1,19 +1,285 @@
 {% extends "base.html" %}
 
-{% block title %}Letra X - Xilófono{% endblock %}
+{% block title %}Letra X - Xilófono Musical{% endblock %}
 
 {% block content %}
 <div class="game-header">
-    <h1 class="game-title">🎹 Letra X - Xilófono</h1>
-    <p class="game-description">¡Próximamente disponible!</p>
+    <h1 class="game-title">🎹 Letra X - Xilófono Musical</h1>
+    <p class="game-description">¡Toca las teclas del xilófono y crea música!</p>
     <a href="{{ url_for('index') }}" class="back-button">🏠 Volver al Menú</a>
 </div>
 
 <div class="game-canvas-container">
-    <div style="text-align: center; padding: 100px 20px;">
-        <h2 style="font-size: 5rem; margin-bottom: 20px;">🚧</h2>
-        <h2 style="font-size: 2.5rem; color: #667eea; margin-bottom: 20px;">En Construcción</h2>
-        <p style="font-size: 1.5rem; color: #666;">Este juego estará disponible próximamente</p>
-    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Ajustar canvas a dispositivo móvil
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const maxWidth = Math.min(800, container.clientWidth - 40);
+    const scale = maxWidth / 800;
+    canvas.style.width = maxWidth + 'px';
+    canvas.style.height = (600 * scale) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Definir las teclas del xilófono
+const keys = [
+    { note: 'Do', color: '#FF6B6B', audio: '/assets/audio/xilofono/1.mp3', pressed: false },
+    { note: 'Re', color: '#FFA500', audio: '/assets/audio/xilofono/2.mp3', pressed: false },
+    { note: 'Mi', color: '#FFD93D', audio: '/assets/audio/xilofono/3.mp3', pressed: false },
+    { note: 'Fa', color: '#6BCF7F', audio: '/assets/audio/xilofono/4.mp3', pressed: false },
+    { note: 'Sol', color: '#4D96FF', audio: '/assets/audio/xilofono/5.mp3', pressed: false },
+    { note: 'La', color: '#9D4EDD', audio: '/assets/audio/xilofono/6.mp3', pressed: false },
+    { note: 'Si', color: '#FF69B4', audio: '/assets/audio/xilofono/7.mp3', pressed: false },
+    { note: 'Do', color: '#FF6B6B', audio: '/assets/audio/xilofono/8.mp3', pressed: false }
+];
+
+// Cargar todos los audios
+keys.forEach(key => {
+    key.sound = new Audio(key.audio);
+    key.sound.preload = 'auto';
+});
+
+// Variables del xilófono
+const xylophoneX = 100;
+const xylophoneY = 200;
+const keyWidth = 70;
+const keySpacing = 10;
+const baseHeight = 180;
+
+// Calcular posiciones de las teclas
+keys.forEach((key, index) => {
+    // Las teclas tienen diferentes alturas para simular un xilófono real
+    const heightReduction = index * 15;
+    key.height = baseHeight - heightReduction;
+    key.x = xylophoneX + index * (keyWidth + keySpacing);
+    key.y = xylophoneY + heightReduction / 2;
+    key.width = keyWidth;
+});
+
+// Función para obtener posición del input
+function getInputPosition(e, canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+// Verificar si un punto está dentro de una tecla
+function isInsideKey(x, y, key) {
+    return x >= key.x && x <= key.x + key.width &&
+           y >= key.y && y <= key.y + key.height;
+}
+
+// Tocar una tecla
+function playKey(key) {
+    // Reiniciar el audio si ya está sonando
+    key.sound.currentTime = 0;
+    key.sound.play();
+    
+    // Marcar como presionada
+    key.pressed = true;
+    
+    // Desmarcar después de un tiempo
+    setTimeout(() => {
+        key.pressed = false;
+    }, 200);
+}
+
+// Dibujar una tecla del xilófono
+function drawKey(key) {
+    ctx.save();
+    
+    // Sombra
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 3;
+    ctx.shadowOffsetY = 3;
+    
+    // Color de la tecla (más oscuro si está presionada)
+    if (key.pressed) {
+        ctx.fillStyle = darkenColor(key.color, 30);
+        ctx.translate(0, 5); // Efecto de hundimiento
+    } else {
+        ctx.fillStyle = key.color;
+    }
+    
+    // Dibujar tecla con bordes redondeados
+    const radius = 10;
+    ctx.beginPath();
+    ctx.moveTo(key.x + radius, key.y);
+    ctx.lineTo(key.x + key.width - radius, key.y);
+    ctx.quadraticCurveTo(key.x + key.width, key.y, key.x + key.width, key.y + radius);
+    ctx.lineTo(key.x + key.width, key.y + key.height - radius);
+    ctx.quadraticCurveTo(key.x + key.width, key.y + key.height, key.x + key.width - radius, key.y + key.height);
+    ctx.lineTo(key.x + radius, key.y + key.height);
+    ctx.quadraticCurveTo(key.x, key.y + key.height, key.x, key.y + key.height - radius);
+    ctx.lineTo(key.x, key.y + radius);
+    ctx.quadraticCurveTo(key.x, key.y, key.x + radius, key.y);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Borde brillante
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Borde oscuro
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.restore();
+    
+    // Nota musical
+    ctx.font = 'bold 20px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textY = key.y + key.height - 30;
+    ctx.strokeText(key.note, key.x + key.width / 2, textY);
+    ctx.fillText(key.note, key.x + key.width / 2, textY);
+}
+
+// Función para oscurecer un color
+function darkenColor(color, percent) {
+    const num = parseInt(color.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) - amt;
+    const G = (num >> 8 & 0x00FF) - amt;
+    const B = (num & 0x0000FF) - amt;
+    return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+        (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+        (B < 255 ? B < 1 ? 0 : B : 255))
+        .toString(16).slice(1);
+}
+
+// Dibujar notas musicales flotantes
+let floatingNotes = [];
+
+function addFloatingNote(x, y) {
+    floatingNotes.push({
+        x: x,
+        y: y,
+        opacity: 1,
+        size: 20,
+        velocity: -2
+    });
+}
+
+function updateFloatingNotes() {
+    floatingNotes = floatingNotes.filter(note => note.opacity > 0);
+    
+    floatingNotes.forEach(note => {
+        note.y += note.velocity;
+        note.opacity -= 0.02;
+        
+        ctx.save();
+        ctx.globalAlpha = note.opacity;
+        ctx.font = `${note.size}px Arial`;
+        ctx.fillStyle = '#FFD700';
+        ctx.textAlign = 'center';
+        ctx.fillText('♪', note.x, note.y);
+        ctx.restore();
+    });
+}
+
+// Manejar click/touch
+function handleInput(e) {
+    e.preventDefault();
+    const pos = getInputPosition(e, canvas);
+    
+    keys.forEach(key => {
+        if (isInsideKey(pos.x, pos.y, key)) {
+            playKey(key);
+            addFloatingNote(key.x + key.width / 2, key.y);
+        }
+    });
+}
+
+// Event listeners
+canvas.addEventListener('mousedown', handleInput);
+canvas.addEventListener('touchstart', handleInput);
+
+// Loop del juego
+function gameLoop() {
+    // Fondo
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#667eea');
+    gradient.addColorStop(1, '#764ba2');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Título
+    ctx.font = 'bold 36px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 5;
+    ctx.textAlign = 'center';
+    ctx.strokeText('🎹 Xilófono Musical', canvas.width / 2, 60);
+    ctx.fillText('🎹 Xilófono Musical', canvas.width / 2, 60);
+    
+    // Instrucciones
+    ctx.font = 'bold 20px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.strokeText('¡Toca las teclas para hacer música!', canvas.width / 2, 110);
+    ctx.fillText('¡Toca las teclas para hacer música!', canvas.width / 2, 110);
+    
+    // Dibujar base del xilófono
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(xylophoneX - 20, xylophoneY + baseHeight + 10, 
+                 keys.length * (keyWidth + keySpacing) + 20, 20);
+    
+    // Soportes del xilófono
+    ctx.fillStyle = '#654321';
+    ctx.fillRect(xylophoneX - 10, xylophoneY + baseHeight + 30, 15, 40);
+    ctx.fillRect(xylophoneX + keys.length * (keyWidth + keySpacing) - 15, 
+                 xylophoneY + baseHeight + 30, 15, 40);
+    
+    // Dibujar teclas
+    keys.forEach(key => drawKey(key));
+    
+    // Actualizar y dibujar notas flotantes
+    updateFloatingNotes();
+    
+    // Mensaje motivacional
+    ctx.font = 'bold 18px Arial';
+    ctx.fillStyle = '#FFD700';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.textAlign = 'center';
+    ctx.strokeText('Do - Re - Mi - Fa - Sol - La - Si - Do', canvas.width / 2, 500);
+    ctx.fillText('Do - Re - Mi - Fa - Sol - La - Si - Do', canvas.width / 2, 500);
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// Iniciar
+gameLoop();
+</script>
 {% endblock %}
